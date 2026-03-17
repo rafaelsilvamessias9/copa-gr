@@ -14,14 +14,13 @@ import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebase
 // Veja o guia no banner amarelo ao abrir a página
 // ══════════════════════════════════════════════════
 const firebaseConfig = {
-  apiKey: "AIzaSyDbPnBCnnkSwug3cmBE327mi_PkRg8UG00",
-  authDomain: "copa-gr.firebaseapp.com",
-  databaseURL: "https://copa-gr-default-rtdb.firebaseio.com",
-  projectId: "copa-gr",
-  storageBucket: "copa-gr.firebasestorage.app",
-  messagingSenderId: "761976648198",
-  appId: "1:761976648198:web:172ff37f3df5f9d40ec987",
-  measurementId: "G-YD1F4SC43W"
+  apiKey: "",
+  authDomain: "",
+  databaseURL: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: ""
 };
 
 window.__firebaseReady = false;
@@ -353,6 +352,19 @@ body::before{
 </style>
 </head>
 <body>
+
+<!-- LOADING SPLASH -->
+<div id="loadingSplash" style="position:fixed;inset:0;z-index:9999;background:#060608;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;">
+  <div style="font-size:3rem;">🏆</div>
+  <div style="font-family:'Anton',sans-serif;font-size:2rem;letter-spacing:6px;color:#FFD700;text-shadow:0 0 30px rgba(255,215,0,.4);">COPA GR</div>
+  <div style="font-family:'Oswald',sans-serif;font-size:.7rem;letter-spacing:4px;color:#6b6250;text-transform:uppercase;">Carregando dados...</div>
+  <div style="width:120px;height:2px;background:#1c1c28;border-radius:2px;overflow:hidden;margin-top:.5rem;">
+    <div style="height:100%;background:linear-gradient(90deg,#c9a227,#FFD700);animation:loadBar 1.5s ease infinite;" ></div>
+  </div>
+</div>
+<style>
+@keyframes loadBar{0%{width:0%;margin-left:0}60%{width:100%;margin-left:0}100%{width:0%;margin-left:100%}}
+</style>
 
 <!-- HEADER -->
 <div class="header">
@@ -1081,15 +1093,8 @@ function getState(){
   };
 }
 
-function saveState(){
-  // Always save to localStorage as fallback
-  try { localStorage.setItem('copa_gr_state', JSON.stringify(getState())); } catch(e){}
-  // Save to Firebase if ready
-  if(window.__saveToCloud) window.__saveToCloud(getState());
-}
-
-window.__loadStateFromCloud = function(data){
-  if(!data||!data.sellers)return;
+function applyState(data){
+  if(!data||!data.sellers)return false;
   sellers = data.sellers.map(s=>({...s}));
   allRounds = (data.allRounds||[]).map(round=>round.map(m=>({
     a:m.a?{...m.a}:null,
@@ -1101,26 +1106,49 @@ window.__loadStateFromCloud = function(data){
   })));
   currentRoundIdx = data.currentRoundIdx||0;
   matchCount = data.matchCount||0;
-  renderEverything();
-};
-
-function loadLocalState(){
-  try {
-    const raw = localStorage.getItem('copa_gr_state');
-    if(raw){ window.__loadStateFromCloud(JSON.parse(raw)); return true; }
-  } catch(e){}
-  return false;
+  return true;
 }
 
-// Patch all state-changing functions to auto-save
+function saveState(){
+  const state = getState();
+  // Always save to localStorage as instant cache
+  try { localStorage.setItem('copa_gr_state', JSON.stringify(state)); } catch(e){}
+  // Save to Firebase
+  if(window.__saveToCloud) window.__saveToCloud(state);
+}
+
+// Called by Firebase module on first load and on remote changes
+window.__loadStateFromCloud = function(data){
+  if(!data||!data.sellers) return;
+  // Only apply if Firebase data is newer than what we have loaded
+  const localRaw = localStorage.getItem('copa_gr_state');
+  const localTs = localRaw ? (JSON.parse(localRaw).ts||0) : 0;
+  const remoteTs = data.ts||0;
+  if(remoteTs >= localTs){
+    if(applyState(data)){
+      try { localStorage.setItem('copa_gr_state', JSON.stringify(data)); } catch(e){}
+      renderEverything();
+      hideSplash();
+    }
+  } else {
+    hideSplash();
+  }
+};
+
+function hideSplash(){
+  const s = document.getElementById('loadingSplash');
+  if(s) s.style.display='none';
+}
+
+// ══ PATCH FUNCTIONS TO AUTO-SAVE ══
 const _origGenerateBracket = generateBracket;
 generateBracket = function(){ _origGenerateBracket(); saveState(); };
 
 const _origAdvanceRound = advanceRound;
 advanceRound = function(){ _origAdvanceRound(); saveState(); };
 
-const _origDeclareWinner = finalizeMatch;
-finalizeMatch = function(r){ _origDeclareWinner(r); saveState(); };
+const _origFinalizeMatch = finalizeMatch;
+finalizeMatch = function(r){ _origFinalizeMatch(r); saveState(); };
 
 const _origAdjustScore = adjustScore;
 adjustScore = function(s,d){ _origAdjustScore(s,d); saveState(); };
@@ -1142,15 +1170,34 @@ resetAll = function(){
   if(!confirm('Reiniciar toda a Copa GR? Isso apagará tudo, inclusive na nuvem.'))return;
   sellers=defaultSellers.map((s,i)=>({...s,id:i,status:'alive',wins:0,calls:0,fichas:0}));
   allRounds=[];currentRoundIdx=0;currentMatchIdx=null;matchCount=0;editMode=false;swapSource=null;
-  updateEditModeUI();document.getElementById('champBanner').classList.remove('show');
+  updateEditModeUI();
+  document.getElementById('champBanner').classList.remove('show');
   document.getElementById('progressStrip').innerHTML='';
   renderEverything();saveState();
 };
 
-// ══ INIT ══
-if(!loadLocalState()){
-  renderSellers();updateStats();
-}
+// ══ INIT — carrega localStorage imediatamente, Firebase sobrepõe se mais novo ══
+(function init(){
+  const raw = localStorage.getItem('copa_gr_state');
+  if(raw){
+    try{
+      const local = JSON.parse(raw);
+      if(applyState(local)){
+        renderEverything();
+        // If Firebase is configured, it will call __loadStateFromCloud shortly
+        // and override if remote is newer. Hide splash after short timeout as fallback.
+        setTimeout(hideSplash, 3000);
+        return;
+      }
+    }catch(e){}
+  }
+  // No local state — wait for Firebase or show default after timeout
+  setTimeout(()=>{
+    hideSplash();
+    renderSellers();
+    updateStats();
+  }, 3000);
+})();
 </script>
 </body>
 </html>

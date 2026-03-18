@@ -5,14 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Copa GR — Mata-Mata</title>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600;700&family=Barlow+Condensed:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-// ══════════════════════════════════════════════════
-// 🔥 COLE AQUI AS SUAS CREDENCIAIS DO FIREBASE
-// Veja o guia no banner amarelo ao abrir a página
-// ══════════════════════════════════════════════════
+<!-- Firebase compat (funciona em TODOS os navegadores incluindo Silk do Fire TV) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyDbPnBCnnkSwug3cmBE327mi_PkRg8UG00",
   authDomain: "copa-gr.firebaseapp.com",
@@ -25,47 +21,9 @@ const firebaseConfig = {
 };
 
 window.__firebaseReady = false;
-window.__db = null;
-window.__dbRef = null;
 window.__isSyncing = false;
 
-if (firebaseConfig.apiKey && firebaseConfig.databaseURL) {
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    window.__db = db;
-    window.__dbRef = ref(db, 'copa_gr/estado');
-    window.__firebaseReady = true;
-
-    // Listen for remote changes
-    onValue(window.__dbRef, (snapshot) => {
-      if (window.__isSyncing) return;
-      const data = snapshot.val();
-      if (!data) return;
-      try {
-        window.__loadStateFromCloud(data);
-      } catch(e) { console.error('Erro ao carregar estado:', e); }
-    });
-
-    window.__saveToCloud = function(state) {
-      if (!window.__firebaseReady) return;
-      window.__isSyncing = true;
-      set(window.__dbRef, state).finally(() => {
-        setTimeout(() => { window.__isSyncing = false; }, 500);
-      });
-    };
-
-    updateSyncStatus('connected');
-  } catch(e) {
-    console.error('Firebase erro:', e);
-    updateSyncStatus('error');
-  }
-} else {
-  updateSyncStatus('not-configured');
-}
-
 function updateSyncStatus(status) {
-  window.__syncStatus = status;
   const el = document.getElementById('syncStatus');
   if (!el) { setTimeout(() => updateSyncStatus(status), 300); return; }
   if (status === 'connected') {
@@ -74,9 +32,6 @@ function updateSyncStatus(status) {
     el.style.borderColor = 'rgba(46,204,113,.3)';
     el.style.color = '#2ecc71';
     el.style.display = 'flex';
-  } else if (status === 'not-configured') {
-    el.innerHTML = '⚠️ <strong>Configure o Firebase</strong> para sincronizar entre dispositivos — <a href="#" onclick="document.getElementById(\'firebaseGuide\').style.display=\'block\';return false;" style="color:inherit;text-decoration:underline;">ver instruções</a>';
-    el.style.display = 'flex';
   } else if (status === 'error') {
     el.innerHTML = '🔴 Erro ao conectar com Firebase — verifique as credenciais';
     el.style.background = 'rgba(230,57,70,.1)';
@@ -84,6 +39,38 @@ function updateSyncStatus(status) {
     el.style.color = '#e63946';
     el.style.display = 'flex';
   }
+}
+
+try {
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const dbRef = db.ref('copa_gr/estado');
+  window.__firebaseReady = true;
+
+  // Listen for remote changes in real time
+  dbRef.on('value', function(snapshot) {
+    if (window.__isSyncing) return;
+    const data = snapshot.val();
+    if (!data) return;
+    try { window.__loadStateFromCloud(data); } 
+    catch(e) { console.error('Erro ao carregar estado:', e); }
+  });
+
+  window.__saveToCloud = function(state) {
+    if (!window.__firebaseReady) return;
+    window.__isSyncing = true;
+    dbRef.set(state).then(function() {
+      setTimeout(function() { window.__isSyncing = false; }, 500);
+    }).catch(function(e) {
+      console.error('Erro ao salvar:', e);
+      window.__isSyncing = false;
+    });
+  };
+
+  updateSyncStatus('connected');
+} catch(e) {
+  console.error('Firebase erro:', e);
+  updateSyncStatus('error');
 }
 </script>
 <style>
@@ -345,6 +332,122 @@ body::before{
 .guide-step-text{font-size:.82rem;color:var(--text);line-height:1.5;}
 .guide-step-text a{color:var(--blue);}
 .guide-code{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:.5rem .75rem;font-family:monospace;font-size:.75rem;color:var(--green);margin-top:.4rem;word-break:break-all;}
+/* ── PHOTO ── */
+.photo-upload-wrap{display:flex;flex-direction:column;gap:4px;min-width:90px;}
+.photo-preview-btn{width:60px;height:60px;border-radius:50%;border:2px dashed var(--border);background:var(--surface3);cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:border-color .2s;flex-shrink:0;}
+.photo-preview-btn:hover{border-color:var(--gold);}
+.photo-preview-btn img{width:100%;height:100%;object-fit:cover;}
+.photo-preview-btn .photo-placeholder{font-size:1.4rem;}
+.photo-input{display:none;}
+
+/* card photo */
+.card-photo{width:52px;height:52px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,215,0,.3);flex-shrink:0;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:1.4rem;}
+.card-photo img{width:100%;height:100%;object-fit:cover;}
+.card-top{display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem;}
+.card-info{flex:1;min-width:0;}
+
+/* bracket photo */
+.mp-photo{width:22px;height:22px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--surface3);border:1px solid rgba(255,215,0,.2);display:flex;align-items:center;justify-content:center;font-size:.7rem;}
+.mp-photo img{width:100%;height:100%;object-fit:cover;}
+
+/* modal photo */
+.vp-photo{width:64px;height:64px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,215,0,.3);margin:0 auto .5rem;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:2rem;}
+.vp-photo img{width:100%;height:100%;object-fit:cover;}
+
+/* ── BRACKET LAYOUT WITH SIDEBAR ── */
+.bracket-layout{display:flex;gap:0;min-height:calc(100vh - 200px);}
+.bracket-main{flex:1;overflow-x:auto;padding:0;}
+.sidebar{width:280px;flex-shrink:0;border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;transition:all .3s;}
+.sidebar.hidden{width:0;overflow:hidden;border:none;}
+.sidebar-header{padding:.75rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.3);}
+.sidebar-title{font-family:'Anton',sans-serif;font-size:.8rem;letter-spacing:3px;color:var(--gold);}
+.sidebar-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1rem;transition:color .2s;}
+.sidebar-close:hover{color:var(--red);}
+.sidebar-body{flex:1;overflow-y:auto;padding:.75rem;}
+.sidebar-add{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.75rem;margin-bottom:.75rem;}
+.sidebar-add-title{font-family:'Oswald',sans-serif;font-size:.65rem;letter-spacing:3px;color:var(--gold3);text-transform:uppercase;margin-bottom:.6rem;}
+.sb-field{margin-bottom:.5rem;}
+.sb-label{font-size:.58rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:3px;display:block;}
+.sb-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:6px 8px;font-size:.82rem;font-family:'Barlow Condensed',sans-serif;}
+.sb-input:focus{outline:none;border-color:var(--gold);}
+.sb-photo-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;}
+.sb-photo-btn{width:44px;height:44px;border-radius:50%;border:2px dashed var(--border);background:var(--surface3);cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;transition:border-color .2s;}
+.sb-photo-btn:hover{border-color:var(--gold);}
+.sb-photo-btn img{width:100%;height:100%;object-fit:cover;}
+.sb-flag-row{display:flex;gap:.4rem;align-items:center;}
+.sb-flag-preview{width:32px;height:30px;background:var(--bg);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;cursor:pointer;flex-shrink:0;}
+
+/* player list in sidebar */
+.sb-player-list{display:flex;flex-direction:column;gap:.4rem;}
+.sb-player-item{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.5rem .6rem;display:flex;align-items:center;gap:.5rem;transition:border-color .2s;}
+.sb-player-item:hover{border-color:rgba(255,215,0,.3);}
+.sb-player-item.eliminated{opacity:.35;}
+.sb-player-item.champion{border-color:var(--gold);}
+.sb-p-avatar{width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;border:1px solid rgba(255,215,0,.2);}
+.sb-p-avatar img{width:100%;height:100%;object-fit:cover;}
+.sb-p-info{flex:1;min-width:0;}
+.sb-p-name{font-family:'Oswald',sans-serif;font-size:.75rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sb-p-country{font-size:.55rem;letter-spacing:1px;color:var(--muted);text-transform:uppercase;}
+.sb-p-actions{display:flex;gap:3px;flex-shrink:0;}
+.sb-p-btn{width:24px;height:24px;border-radius:3px;border:1px solid;background:none;cursor:pointer;font-size:.7rem;display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.sb-p-btn.edit{border-color:rgba(79,195,247,.3);color:var(--blue);}
+.sb-p-btn.edit:hover{background:rgba(79,195,247,.1);border-color:var(--blue);}
+.sb-p-btn.del{border-color:rgba(230,57,70,.2);color:var(--red);}
+.sb-p-btn.del:hover{background:rgba(230,57,70,.1);border-color:var(--red);}
+.sb-section-title{font-family:'Oswald',sans-serif;font-size:.6rem;letter-spacing:3px;color:var(--gold3);text-transform:uppercase;margin:.75rem 0 .4rem;padding-bottom:.3rem;border-bottom:1px solid var(--border);}
+
+/* toggle sidebar btn */
+.btn-sidebar{background:transparent;color:var(--gold);border-color:rgba(255,215,0,.3);position:relative;}
+.btn-sidebar:hover{border-color:var(--gold);background:rgba(255,215,0,.07);}
+.sidebar-count{position:absolute;top:-5px;right:-5px;background:var(--gold);color:#000;border-radius:50%;width:16px;height:16px;font-size:.55rem;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Oswald',sans-serif;}
+
+/* ── PLAYER EDIT MODAL ── */
+.edit-player-modal{background:var(--surface2);border:1px solid var(--gold2);border-radius:12px;width:min(420px,95vw);max-height:88vh;overflow-y:auto;box-shadow:0 0 40px rgba(0,0,0,.8);}
+.epm-header{background:linear-gradient(180deg,#000,var(--surface2));padding:1rem 1.2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.epm-title{font-family:'Anton',sans-serif;font-size:1rem;letter-spacing:3px;color:var(--gold);}
+.epm-body{padding:1.2rem;}
+.epm-photo-center{display:flex;flex-direction:column;align-items:center;gap:.5rem;margin-bottom:1rem;}
+.epm-photo-btn{width:80px;height:80px;border-radius:50%;border:2px dashed var(--border);background:var(--surface3);cursor:pointer;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:2rem;transition:border-color .2s;}
+.epm-photo-btn:hover{border-color:var(--gold);}
+.epm-photo-btn img{width:100%;height:100%;object-fit:cover;}
+.epm-photo-hint{font-size:.58rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.epm-field{margin-bottom:.75rem;}
+.epm-label{font-size:.6rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px;display:block;}
+.epm-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:8px 10px;font-size:.88rem;font-family:'Barlow Condensed',sans-serif;}
+.epm-input:focus{outline:none;border-color:var(--gold);}
+.epm-flag-row{display:flex;gap:.5rem;align-items:center;}
+.epm-flag-preview{width:40px;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;flex-shrink:0;}
+.epm-actions{display:flex;gap:.5rem;margin-top:1rem;}
+
+/* flag picker inside sidebar (reuse same dropdown styles) */
+
+/* ── EDIT ACTION MENU (in-bracket popup) ── */
+.edit-action-menu{
+  position:fixed;z-index:999;
+  background:var(--surface2);border:1px solid var(--blue);
+  border-radius:8px;padding:6px;
+  box-shadow:0 8px 32px rgba(0,0,0,.8),0 0 20px rgba(79,195,247,.15);
+  min-width:180px;
+}
+.edit-action-menu-header{
+  font-family:'Oswald',sans-serif;font-size:.6rem;letter-spacing:2px;
+  color:var(--blue);text-transform:uppercase;
+  padding:4px 8px 8px;border-bottom:1px solid rgba(79,195,247,.15);
+  margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.edit-action-btn{
+  display:flex;align-items:center;gap:8px;
+  width:100%;padding:8px 10px;border:none;background:none;
+  color:var(--text);cursor:pointer;border-radius:5px;
+  font-family:'Barlow Condensed',sans-serif;font-size:.82rem;font-weight:600;
+  transition:background .15s;text-align:left;
+}
+.edit-action-btn:hover{background:rgba(255,255,255,.06);}
+.edit-action-btn .eab-icon{font-size:1rem;width:20px;text-align:center;flex-shrink:0;}
+.edit-action-btn.swap{color:var(--blue);}
+.edit-action-btn.edit-info{color:var(--gold);}
+.edit-action-btn.del{color:var(--red);}
+
 /* misc */
 .live-dot{display:inline-block;width:7px;height:7px;background:var(--red);border-radius:50%;margin-right:5px;animation:blink 1.2s ease infinite;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -441,6 +544,10 @@ body::before{
       <button class="btn btn-primary" onclick="generateBracket()">⚡ Gerar Chaveamento</button>
       <button class="btn btn-blue" id="editModeBtn" onclick="toggleEditMode()">✏️ Editar Chaveamento</button>
       <button class="btn btn-outline" onclick="advanceRound()">➡ Próxima Rodada</button>
+      <button class="btn btn-sidebar" onclick="toggleSidebar()" id="sidebarBtn">
+        👥 Elenco
+        <span class="sidebar-count" id="sidebarCount">0</span>
+      </button>
       <button class="btn btn-danger" onclick="resetAll()">↺ Reiniciar</button>
     </div>
     <div class="edit-banner" id="editBanner">
@@ -448,11 +555,64 @@ body::before{
       <span>MODO EDIÇÃO — Clique num participante para trocar de posição no chaveamento</span>
       <button class="btn btn-blue" style="margin-left:auto;padding:.3rem .8rem;font-size:.6rem;" onclick="toggleEditMode()">✕ Sair</button>
     </div>
-    <div id="bracketWrap">
-      <div class="bracket-empty">
-        <div class="bracket-empty-icon">🏆</div>
-        <div class="bracket-empty-text">Aguardando início do torneio</div>
-        <button class="btn btn-primary" style="margin-top:.5rem" onclick="generateBracket()">⚡ Gerar Chaveamento</button>
+
+    <div class="bracket-layout">
+      <!-- BRACKET MAIN -->
+      <div class="bracket-main" id="bracketWrap">
+        <div class="bracket-empty" style="padding:1.5rem">
+          <div class="bracket-empty-icon">🏆</div>
+          <div class="bracket-empty-text">Aguardando início do torneio</div>
+          <button class="btn btn-primary" style="margin-top:.5rem" onclick="generateBracket()">⚡ Gerar Chaveamento</button>
+        </div>
+      </div>
+
+      <!-- SIDEBAR ELENCO -->
+      <div class="sidebar hidden" id="bracketSidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-title">👥 Elenco</div>
+          <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+        </div>
+        <div class="sidebar-body">
+
+          <!-- ADD FORM -->
+          <div class="sidebar-add">
+            <div class="sidebar-add-title">+ Novo Participante</div>
+            <div class="sb-photo-row">
+              <div class="sb-photo-btn" id="sb-photo-preview" onclick="document.getElementById('sb-inp-photo').click()">📷</div>
+              <input type="file" id="sb-inp-photo" accept="image/*" style="display:none" onchange="handleSbPhoto(this)">
+              <div style="flex:1">
+                <div class="sb-field">
+                  <span class="sb-label">Nome</span>
+                  <input class="sb-input" id="sb-inp-name" placeholder="Nome do vendedor">
+                </div>
+              </div>
+            </div>
+            <div class="sb-field">
+              <span class="sb-label">País</span>
+              <input class="sb-input" id="sb-inp-country" placeholder="País">
+            </div>
+            <div class="sb-field">
+              <span class="sb-label">Bandeira</span>
+              <div class="sb-flag-row" style="position:relative;">
+                <div class="sb-flag-preview" id="sb-flag-preview" onclick="toggleSbFlagPicker()">🏳️</div>
+                <button type="button" onclick="toggleSbFlagPicker()" style="background:var(--surface3);border:1px solid var(--border);color:var(--gold);border-radius:4px;padding:5px 8px;cursor:pointer;font-size:.65rem;font-family:'Oswald',sans-serif;letter-spacing:2px;">▼ País</button>
+                <input type="hidden" id="sb-inp-flag" value="🏳️">
+                <div class="flag-dropdown" id="sbFlagPicker" style="top:100%;left:0;width:260px;">
+                  <input class="flag-search" id="sbFlagSearch" placeholder="🔍 Buscar..." oninput="filterSbFlags(this.value)">
+                  <div class="flag-grid" id="sbFlagGrid"></div>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary" style="width:100%;margin-top:.4rem;" onclick="addSellerFromSidebar()">+ Adicionar</button>
+          </div>
+
+          <!-- PLAYER LIST -->
+          <div class="sb-section-title">Em jogo</div>
+          <div class="sb-player-list" id="sbPlayerListAlive"></div>
+          <div class="sb-section-title" id="sbEliminatedTitle" style="display:none;">Eliminados</div>
+          <div class="sb-player-list" id="sbPlayerListElim"></div>
+
+        </div>
       </div>
     </div>
   </div>
@@ -478,6 +638,13 @@ body::before{
             <input class="flag-search" id="flagSearch" placeholder="🔍 Buscar país..." oninput="filterFlags(this.value)">
             <div class="flag-grid" id="flagGrid"></div>
           </div>
+        </div>
+        <div class="photo-upload-wrap">
+          <label class="form-label">Foto</label>
+          <div class="photo-preview-btn" onclick="document.getElementById('inp-photo').click()" id="photo-preview-btn">
+            <span class="photo-placeholder">📷</span>
+          </div>
+          <input type="file" class="photo-input" id="inp-photo" accept="image/*" onchange="handlePhotoUpload(this)">
         </div>
         <button class="btn btn-primary" style="align-self:flex-end" onclick="addSeller()">Adicionar</button>
       </div>
@@ -507,10 +674,11 @@ body::before{
 
       <!-- SCOREBOARD -->
       <div class="scoreboard">
-        <div class="sb-player" id="sbPlayerA">
+        <div class="sb-player" id="sbPlayerA" style="position:relative;">
           <div class="sb-flag" id="sbFlagA">🏳️</div>
           <div class="sb-name" id="sbNameA">—</div>
           <div class="sb-country" id="sbCountryA">—</div>
+          <button onclick="editPlayerInMatch('a')" title="Editar participante" style="position:absolute;top:6px;right:6px;background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.3);color:var(--blue);border-radius:4px;padding:2px 6px;cursor:pointer;font-size:.6rem;font-family:'Oswald',sans-serif;letter-spacing:1px;transition:all .2s;" onmouseover="this.style.background='rgba(79,195,247,.2)'" onmouseout="this.style.background='rgba(79,195,247,.1)'">✏️</button>
         </div>
         <div class="sb-score-col">
           <div class="sb-score-box" id="scoreBoxA">0</div>
@@ -526,10 +694,11 @@ body::before{
             <button class="score-btn minus" onclick="adjustScore('b',-1)" title="-1">−</button>
           </div>
         </div>
-        <div class="sb-player" id="sbPlayerB">
+        <div class="sb-player" id="sbPlayerB" style="position:relative;">
           <div class="sb-flag" id="sbFlagB">🏳️</div>
           <div class="sb-name" id="sbNameB">—</div>
           <div class="sb-country" id="sbCountryB">—</div>
+          <button onclick="editPlayerInMatch('b')" title="Editar participante" style="position:absolute;top:6px;right:6px;background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.3);color:var(--blue);border-radius:4px;padding:2px 6px;cursor:pointer;font-size:.6rem;font-family:'Oswald',sans-serif;letter-spacing:1px;transition:all .2s;" onmouseover="this.style.background='rgba(79,195,247,.2)'" onmouseout="this.style.background='rgba(79,195,247,.1)'">✏️</button>
         </div>
       </div>
 
@@ -584,8 +753,61 @@ body::before{
   </div>
 </div>
 
+<!-- EDIT ACTION MENU -->
+<div id="editActionMenu" class="edit-action-menu" style="display:none;">
+  <div class="edit-action-menu-header" id="eamPlayerName">Jogador</div>
+  <button class="edit-action-btn swap" onclick="eamSwap()">
+    <span class="eab-icon">↔</span> Trocar de posição
+  </button>
+  <button class="edit-action-btn edit-info" onclick="eamEdit()">
+    <span class="eab-icon">✏️</span> Editar nome, foto, dados
+  </button>
+  <button class="edit-action-btn del" onclick="eamDelete()">
+    <span class="eab-icon">🗑</span> Excluir participante
+  </button>
+</div>
+
+<!-- EDIT PLAYER MODAL -->
+<div class="modal-overlay" id="editPlayerModal" onclick="closeEditPlayerOverlay(event)">
+  <div class="edit-player-modal">
+    <div class="epm-header">
+      <div class="epm-title">✏️ Editar Participante</div>
+      <button class="modal-close" onclick="closeEditPlayerModal()">✕</button>
+    </div>
+    <div class="epm-body">
+      <div class="epm-photo-center">
+        <div class="epm-photo-btn" id="epm-photo-btn" onclick="document.getElementById('epm-inp-photo').click()">📷</div>
+        <div class="epm-photo-hint">Clique para trocar a foto</div>
+        <input type="file" id="epm-inp-photo" accept="image/*" style="display:none" onchange="handleEpmPhoto(this)">
+      </div>
+      <div class="epm-field"><label class="epm-label">Nome</label><input class="epm-input" id="epm-inp-name" placeholder="Nome do vendedor"></div>
+      <div class="epm-field"><label class="epm-label">País</label><input class="epm-input" id="epm-inp-country" placeholder="País"></div>
+      <div class="epm-field">
+        <label class="epm-label">Bandeira</label>
+        <div class="epm-flag-row" style="position:relative;">
+          <div class="epm-flag-preview" id="epm-flag-preview" onclick="toggleEpmFlagPicker()">🏳️</div>
+          <button type="button" onclick="toggleEpmFlagPicker()" style="background:var(--surface3);border:1px solid var(--border);color:var(--gold);border-radius:4px;padding:6px 10px;cursor:pointer;font-size:.65rem;font-family:'Oswald',sans-serif;letter-spacing:2px;">▼ Escolher</button>
+          <input type="hidden" id="epm-inp-flag" value="🏳️">
+          <div class="flag-dropdown" id="epmFlagPicker" style="top:100%;left:0;width:270px;">
+            <input class="flag-search" id="epmFlagSearch" placeholder="🔍 Buscar..." oninput="filterEpmFlags(this.value)">
+            <div class="flag-grid" id="epmFlagGrid"></div>
+          </div>
+        </div>
+      </div>
+      <div class="epm-field"><label class="epm-label">Vitórias</label><input class="epm-input" id="epm-inp-wins" type="number" min="0" value="0"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div class="epm-field"><label class="epm-label">Calls</label><input class="epm-input" id="epm-inp-calls" type="number" min="0" value="0"></div>
+        <div class="epm-field"><label class="epm-label">Fichas</label><input class="epm-input" id="epm-inp-fichas" type="number" min="0" value="0"></div>
+      </div>
+      <div class="epm-actions">
+        <button class="btn btn-primary" style="flex:1" onclick="saveEditPlayer()">💾 Salvar</button>
+        <button class="btn btn-danger" onclick="deletePlayerFromModal()">🗑 Excluir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CHAMP -->
-<div class="champ-banner" id="champBanner">
   <div class="champ-inner">
     <div class="champ-rays"></div>
     <div class="champ-trophy">🏆</div>
@@ -670,25 +892,54 @@ function switchTab(tab,el){
 
 // ══ SELLERS ══
 function toggleAddForm(){document.getElementById('addForm').classList.toggle('open');}
+
+let currentPhotoData='';
+function handlePhotoUpload(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    currentPhotoData=e.target.result;
+    const btn=document.getElementById('photo-preview-btn');
+    btn.innerHTML=`<img src="${currentPhotoData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  };
+  reader.readAsDataURL(file);
+}
+
 function addSeller(){
   const name=document.getElementById('inp-name').value.trim();
   const country=document.getElementById('inp-country').value.trim();
   const flag=document.getElementById('inp-flag').value||'🏳️';
   if(!name||!country)return;
-  sellers.push({name,country,flag,id:Date.now(),status:'alive',wins:0,calls:0,fichas:0});
+  sellers.push({name,country,flag,photo:currentPhotoData||'',id:Date.now(),status:'alive',wins:0,calls:0,fichas:0});
   document.getElementById('inp-name').value='';document.getElementById('inp-country').value='';
   document.getElementById('inp-flag').value='🏳️';document.getElementById('flag-preview').textContent='🏳️';
+  document.getElementById('photo-preview-btn').innerHTML='<span class="photo-placeholder">📷</span>';
+  currentPhotoData='';
   renderSellers();updateStats();
 }
 function removeSeller(id){sellers=sellers.filter(s=>s.id!==id);renderSellers();updateStats();}
+
+function playerAvatar(s,size=22){
+  if(s.photo) return `<div class="mp-photo" style="width:${size}px;height:${size}px;"><img src="${s.photo}"></div>`;
+  return `<div class="mp-photo" style="width:${size}px;height:${size}px;font-size:${size*.55}px;">${s.flag}</div>`;
+}
+
 function renderSellers(){
   document.getElementById('sellersGrid').innerHTML=sellers.map(s=>`
     <div class="seller-card ${s.status==='eliminated'?'eliminated':''} ${s.status==='champion'?'champion':''}">
       ${s.status==='eliminated'?'<div class="card-badge badge-elim">Eliminado</div>':''}
       ${s.status==='champion'?'<div class="card-badge badge-champ">🏆 Campeão</div>':''}
       ${s.status==='alive'?'<div class="card-badge badge-alive">Em jogo</div>':''}
-      <div class="card-flag">${s.flag}</div><div class="card-country">${s.country}</div>
-      <div class="card-name">${s.name}</div>
+      <div class="card-top">
+        <div class="card-photo">
+          ${s.photo?`<img src="${s.photo}">`:`<span style="font-size:1.4rem">${s.flag}</span>`}
+        </div>
+        <div class="card-info">
+          <div class="card-country">${s.flag} ${s.country}</div>
+          <div class="card-name">${s.name}</div>
+        </div>
+      </div>
       <div class="card-stats">
         <div class="mini-stat"><span>${s.wins}</span>Vitórias</div>
         <div class="mini-stat"><span>${s.calls}</span>Calls</div>
@@ -749,14 +1000,72 @@ function updateEditModeUI(){
   if(editMode){btn.classList.add('active-edit');btn.textContent='✕ Sair da Edição';banner.classList.add('show');}
   else{btn.classList.remove('active-edit');btn.textContent='✏️ Editar Chaveamento';banner.classList.remove('show');}
 }
-function handleSlotClick(rIdx,mIdx,side){
-  if(!editMode||rIdx!==currentRoundIdx)return;
-  const m=allRounds[rIdx][mIdx];
-  const player=side==='a'?m.a:m.b;
-  if(!player)return;
-  swapSource={rIdx,mIdx,side,player};
+// ── EDIT ACTION MENU ──
+let eamTarget = null; // {rIdx, mIdx, side, player}
+
+function handleSlotClick(rIdx, mIdx, side, event){
+  if(!editMode || rIdx !== currentRoundIdx) return;
+  const m = allRounds[rIdx][mIdx];
+  const player = side==='a' ? m.a : m.b;
+  if(!player) return;
+
+  eamTarget = {rIdx, mIdx, side, player};
+
+  // position menu near click
+  const menu = document.getElementById('editActionMenu');
+  document.getElementById('eamPlayerName').textContent = `${player.flag} ${player.name}`;
+  menu.style.display = 'block';
+
+  // get click position
+  const e = event || window.event;
+  const x = e.clientX, y = e.clientY;
+  const mw = 190, mh = 130;
+  const left = Math.min(x, window.innerWidth - mw - 10);
+  const top  = Math.min(y + 8, window.innerHeight - mh - 10);
+  menu.style.left = left + 'px';
+  menu.style.top  = top + 'px';
+
+  // close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click', closeEamOnOutside, {once:true});
+  }, 10);
+}
+
+function closeEamOnOutside(e){
+  const menu = document.getElementById('editActionMenu');
+  if(!menu.contains(e.target)) closeEam();
+}
+
+function closeEam(){
+  document.getElementById('editActionMenu').style.display='none';
+}
+
+function eamSwap(){
+  closeEam();
+  if(!eamTarget) return;
+  const {rIdx, mIdx, side, player} = eamTarget;
+  swapSource = {rIdx, mIdx, side, player};
   openSwapModal(player);
 }
+
+function eamEdit(){
+  closeEam();
+  if(!eamTarget) return;
+  editingFromMatch = false;
+  openEditPlayerModal(eamTarget.player.id);
+}
+
+function eamDelete(){
+  closeEam();
+  if(!eamTarget) return;
+  const {player} = eamTarget;
+  if(!confirm(`Excluir "${player.name}" do campeonato?`)) return;
+  sellers = sellers.filter(s=>s.id!==player.id);
+  renderSellers(); renderSidebar(); renderBracket(); updateStats();
+  saveState();
+  eamTarget = null;
+}
+
 function openSwapModal(sel){
   document.getElementById('swapSelectedName').textContent=`${sel.flag} ${sel.name}`;
   const round=allRounds[currentRoundIdx];
@@ -792,7 +1101,11 @@ function closeSwapModal(){document.getElementById('swapModal').classList.remove(
 function closeSwapOverlay(e){if(e.target===document.getElementById('swapModal'))closeSwapModal();}
 
 // ══ RENDER ══
-function renderEverything(){renderBracket();renderSellers();updateStats();renderProgress();}
+function renderEverything(){
+  renderBracket();renderSellers();updateStats();renderProgress();
+  document.getElementById('sidebarCount').textContent=sellers.length;
+  renderSidebar();
+}
 
 function renderProgress(){
   const strip=document.getElementById('progressStrip');
@@ -856,17 +1169,19 @@ function renderBracket(){
         html+=`<div class="match-wrap">
           <div class="match ${matchCls} ${isEdit?'edit-mode':''}" ${isClickable?`onclick="openMatch(${rIdx},${mIdx})"`:''}>
             ${badgeHtml}
-            <div class="mp ${clsA} ${isEdit?'edit-slot':''}" ${isEdit?`onclick="handleSlotClick(${rIdx},${mIdx},'a')"`:''}>
-              <span class="mflag">${m.a.flag}</span>
+            <div class="mp ${clsA} ${isEdit?'edit-slot':''}" ${isEdit?`onclick="handleSlotClick(${rIdx},${mIdx},'a',event)"`:''}>
+              ${playerAvatar(m.a)}
+              <span class="mflag" style="font-size:.85rem;">${m.a.flag}</span>
               <span class="mname">${m.a.name}</span>
               <span class="mscore-live">${scoreA>0||scoreB>0||finished?scoreA:''}</span>
-              ${isEdit?'<span style="margin-left:4px;color:rgba(79,195,247,.5);font-size:.65rem;">↔</span>':''}
+              ${isEdit?'<span style="margin-left:4px;color:rgba(79,195,247,.5);font-size:.65rem;">↔ ✏️</span>':''}
             </div>
-            <div class="mp ${clsB} ${isEdit?'edit-slot':''}" ${isEdit?`onclick="handleSlotClick(${rIdx},${mIdx},'b')"`:''}>
-              <span class="mflag">${m.b.flag}</span>
+            <div class="mp ${clsB} ${isEdit?'edit-slot':''}" ${isEdit?`onclick="handleSlotClick(${rIdx},${mIdx},'b',event)"`:''}>
+              ${playerAvatar(m.b)}
+              <span class="mflag" style="font-size:.85rem;">${m.b.flag}</span>
               <span class="mname">${m.b.name}</span>
               <span class="mscore-live">${scoreA>0||scoreB>0||finished?scoreB:''}</span>
-              ${isEdit?'<span style="margin-left:4px;color:rgba(79,195,247,.5);font-size:.65rem;">↔</span>':''}
+              ${isEdit?'<span style="margin-left:4px;color:rgba(79,195,247,.5);font-size:.65rem;">↔ ✏️</span>':''}
             </div>
           </div>
         </div>`;
@@ -888,13 +1203,11 @@ function openMatch(rIdx,mIdx){
   document.getElementById('matchRoundLabel').textContent=`${getRoundName(pCount)} · Duelo ${mIdx+1}`;
   document.getElementById('matchModalTitle').textContent = m.winner||m.draw ? '✏️ Editar Resultado' : '⚽ Placar ao Vivo';
 
-  // fill player info
-  document.getElementById('sbFlagA').textContent=m.a.flag;
-  document.getElementById('sbNameA').textContent=m.a.name;
-  document.getElementById('sbCountryA').textContent=m.a.country;
-  document.getElementById('sbFlagB').textContent=m.b.flag;
-  document.getElementById('sbNameB').textContent=m.b.name;
-  document.getElementById('sbCountryB').textContent=m.b.country;
+  // fill player info with photos
+  const photoA = m.a.photo ? `<div class="vp-photo" style="margin:0 auto .4rem;"><img src="${m.a.photo}"></div>` : `<div class="vp-photo" style="margin:0 auto .4rem;"><span>${m.a.flag}</span></div>`;
+  const photoB = m.b.photo ? `<div class="vp-photo" style="margin:0 auto .4rem;"><img src="${m.b.photo}"></div>` : `<div class="vp-photo" style="margin:0 auto .4rem;"><span>${m.b.flag}</span></div>`;
+  document.getElementById('sbPlayerA').innerHTML = `${photoA}<div class="sb-flag" id="sbFlagA">${m.a.flag}</div><div class="sb-name" id="sbNameA">${m.a.name}</div><div class="sb-country" id="sbCountryA">${m.a.country}</div>`;
+  document.getElementById('sbPlayerB').innerHTML = `${photoB}<div class="sb-flag" id="sbFlagB">${m.b.flag}</div><div class="sb-name" id="sbNameB">${m.b.name}</div><div class="sb-country" id="sbCountryB">${m.b.country}</div>`;
   document.getElementById('winLabelA').textContent=m.a.name;
   document.getElementById('winLabelB').textContent=m.b.name;
   document.getElementById('extraNameA').textContent=m.a.name;
@@ -1075,6 +1388,223 @@ function selectFlag(f,c){
 document.addEventListener('click',e=>{
   if(!flagPickerOpen)return;
   if(!e.target.closest('.flag-picker-wrap')){flagPickerOpen=false;document.getElementById('flagPicker').style.display='none';}
+});
+
+// ══ SIDEBAR ══
+let sidebarOpen = false;
+function toggleSidebar(){
+  sidebarOpen = !sidebarOpen;
+  const sb = document.getElementById('bracketSidebar');
+  sb.classList.toggle('hidden', !sidebarOpen);
+  renderSidebar();
+}
+
+function renderSidebar(){
+  if(!sidebarOpen) return;
+  const alive = sellers.filter(s=>s.status!=='eliminated');
+  const elim  = sellers.filter(s=>s.status==='eliminated');
+  document.getElementById('sidebarCount').textContent = sellers.length;
+
+  function playerRow(s){
+    const avatar = s.photo
+      ? `<div class="sb-p-avatar"><img src="${s.photo}"></div>`
+      : `<div class="sb-p-avatar">${s.flag}</div>`;
+    const cls = s.status==='eliminated'?'eliminated':s.status==='champion'?'champion':'';
+    return `<div class="sb-player-item ${cls}">
+      ${avatar}
+      <div class="sb-p-info">
+        <div class="sb-p-name">${s.name}</div>
+        <div class="sb-p-country">${s.flag} ${s.country}</div>
+      </div>
+      <div class="sb-p-actions">
+        <button class="sb-p-btn edit" onclick="openEditPlayerModal(${s.id})" title="Editar">✏️</button>
+        <button class="sb-p-btn del" onclick="removeSellerAndRefresh(${s.id})" title="Excluir">✕</button>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('sbPlayerListAlive').innerHTML = alive.map(playerRow).join('');
+  document.getElementById('sbPlayerListElim').innerHTML = elim.map(playerRow).join('');
+  const elimTitle = document.getElementById('sbEliminatedTitle');
+  elimTitle.style.display = elim.length ? 'block' : 'none';
+}
+
+function removeSellerAndRefresh(id){
+  if(!confirm('Excluir este participante?')) return;
+  sellers = sellers.filter(s=>s.id!==id);
+  renderSellers(); renderSidebar(); updateStats(); renderBracket();
+  saveState();
+}
+
+// ── Sidebar flag picker ──
+let sbFlagPickerOpen = false;
+function toggleSbFlagPicker(){
+  sbFlagPickerOpen = !sbFlagPickerOpen;
+  const p = document.getElementById('sbFlagPicker');
+  p.style.display = sbFlagPickerOpen ? 'block' : 'none';
+  if(sbFlagPickerOpen){ renderSbFlagGrid(FLAGS); document.getElementById('sbFlagSearch').value=''; setTimeout(()=>document.getElementById('sbFlagSearch').focus(),50); }
+}
+function renderSbFlagGrid(list){
+  document.getElementById('sbFlagGrid').innerHTML = list.map(({f,c})=>`<div class="flag-item" onclick="selectSbFlag('${f}','${c}')" title="${c}">${f}</div>`).join('');
+}
+function filterSbFlags(q){ renderSbFlagGrid(q?FLAGS.filter(({c})=>c.toLowerCase().includes(q.toLowerCase())):FLAGS); }
+function selectSbFlag(f,c){
+  document.getElementById('sb-inp-flag').value=f;
+  document.getElementById('sb-flag-preview').textContent=f;
+  if(!document.getElementById('sb-inp-country').value) document.getElementById('sb-inp-country').value=c;
+  sbFlagPickerOpen=false; document.getElementById('sbFlagPicker').style.display='none';
+}
+
+let sbCurrentPhoto = '';
+function handleSbPhoto(input){
+  const file = input.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = e => {
+    sbCurrentPhoto = e.target.result;
+    const btn = document.getElementById('sb-photo-preview');
+    btn.innerHTML = `<img src="${sbCurrentPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  };
+  r.readAsDataURL(file);
+}
+
+function addSellerFromSidebar(){
+  const name = document.getElementById('sb-inp-name').value.trim();
+  const country = document.getElementById('sb-inp-country').value.trim();
+  const flag = document.getElementById('sb-inp-flag').value || '🏳️';
+  if(!name||!country){ alert('Preencha nome e país!'); return; }
+  sellers.push({name,country,flag,photo:sbCurrentPhoto||'',id:Date.now(),status:'alive',wins:0,calls:0,fichas:0});
+  document.getElementById('sb-inp-name').value='';
+  document.getElementById('sb-inp-country').value='';
+  document.getElementById('sb-inp-flag').value='🏳️';
+  document.getElementById('sb-flag-preview').textContent='🏳️';
+  document.getElementById('sb-photo-preview').innerHTML='📷';
+  sbCurrentPhoto='';
+  renderSellers(); renderSidebar(); updateStats();
+  saveState();
+}
+
+// ══ EDIT PLAYER MODAL ══
+let editingPlayerId = null;
+let epmCurrentPhoto = '';
+let epmFlagPickerOpen = false;
+
+function openEditPlayerModal(id){
+  const s = sellers.find(x=>x.id===id);
+  if(!s) return;
+  editingPlayerId = id;
+  epmCurrentPhoto = s.photo||'';
+  document.getElementById('epm-inp-name').value = s.name;
+  document.getElementById('epm-inp-country').value = s.country;
+  document.getElementById('epm-inp-flag').value = s.flag;
+  document.getElementById('epm-flag-preview').textContent = s.flag;
+  document.getElementById('epm-inp-wins').value = s.wins||0;
+  document.getElementById('epm-inp-calls').value = s.calls||0;
+  document.getElementById('epm-inp-fichas').value = s.fichas||0;
+  const btn = document.getElementById('epm-photo-btn');
+  btn.innerHTML = s.photo ? `<img src="${s.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">` : '📷';
+  document.getElementById('editPlayerModal').classList.add('open');
+}
+
+function handleEpmPhoto(input){
+  const file = input.files[0]; if(!file) return;
+  const r = new FileReader();
+  r.onload = e => {
+    epmCurrentPhoto = e.target.result;
+    document.getElementById('epm-photo-btn').innerHTML = `<img src="${epmCurrentPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  };
+  r.readAsDataURL(file);
+}
+
+function toggleEpmFlagPicker(){
+  epmFlagPickerOpen = !epmFlagPickerOpen;
+  const p = document.getElementById('epmFlagPicker');
+  p.style.display = epmFlagPickerOpen ? 'block' : 'none';
+  if(epmFlagPickerOpen){ renderEpmFlagGrid(FLAGS); document.getElementById('epmFlagSearch').value=''; setTimeout(()=>document.getElementById('epmFlagSearch').focus(),50); }
+}
+function renderEpmFlagGrid(list){
+  document.getElementById('epmFlagGrid').innerHTML = list.map(({f,c})=>`<div class="flag-item" onclick="selectEpmFlag('${f}','${c}')" title="${c}">${f}</div>`).join('');
+}
+function filterEpmFlags(q){ renderEpmFlagGrid(q?FLAGS.filter(({c})=>c.toLowerCase().includes(q.toLowerCase())):FLAGS); }
+function selectEpmFlag(f,c){
+  document.getElementById('epm-inp-flag').value=f;
+  document.getElementById('epm-flag-preview').textContent=f;
+  if(!document.getElementById('epm-inp-country').value) document.getElementById('epm-inp-country').value=c;
+  epmFlagPickerOpen=false; document.getElementById('epmFlagPicker').style.display='none';
+}
+
+// called from match modal ✏️ buttons — side is 'a' or 'b'
+let editingFromMatch = false;
+function editPlayerInMatch(side){
+  if(!currentMatchIdx) return;
+  const {rIdx,mIdx} = currentMatchIdx;
+  const m = allRounds[rIdx][mIdx];
+  const player = side==='a' ? m.a : m.b;
+  if(!player) return;
+  editingFromMatch = true;
+  openEditPlayerModal(player.id);
+}
+
+function saveEditPlayer(){
+  if(!editingPlayerId) return;
+  const s = sellers.find(x=>x.id===editingPlayerId);
+  if(!s) return;
+  s.name    = document.getElementById('epm-inp-name').value.trim() || s.name;
+  s.country = document.getElementById('epm-inp-country').value.trim() || s.country;
+  s.flag    = document.getElementById('epm-inp-flag').value || s.flag;
+  s.wins    = parseInt(document.getElementById('epm-inp-wins').value)||0;
+  s.calls   = parseInt(document.getElementById('epm-inp-calls').value)||0;
+  s.fichas  = parseInt(document.getElementById('epm-inp-fichas').value)||0;
+  if(epmCurrentPhoto) s.photo = epmCurrentPhoto;
+
+  // update player reference inside allRounds so bracket reflects changes live
+  allRounds.forEach(round => round.forEach(m => {
+    if(m.a && m.a.id===s.id) Object.assign(m.a, s);
+    if(m.b && m.b.id===s.id) Object.assign(m.b, s);
+    if(m.winner && m.winner.id===s.id) Object.assign(m.winner, s);
+  }));
+
+  const wasFromMatch = editingFromMatch;
+  editingFromMatch = false;
+  closeEditPlayerModal();
+
+  renderSellers(); renderSidebar(); renderBracket(); updateStats();
+
+  // if opened from match modal, reopen it refreshed
+  if(wasFromMatch && currentMatchIdx){
+    const {rIdx,mIdx} = currentMatchIdx;
+    openMatch(rIdx, mIdx);
+  }
+  saveState();
+}
+
+function deletePlayerFromModal(){
+  if(!editingPlayerId) return;
+  if(!confirm('Excluir este participante definitivamente?')) return;
+  sellers = sellers.filter(s=>s.id!==editingPlayerId);
+  editingFromMatch = false;
+  closeEditPlayerModal();
+  closeModal();
+  renderSellers(); renderSidebar(); renderBracket(); updateStats();
+  saveState();
+}
+
+function closeEditPlayerModal(){
+  document.getElementById('editPlayerModal').classList.remove('open');
+  editingPlayerId=null; epmCurrentPhoto=''; epmFlagPickerOpen=false;
+  document.getElementById('epmFlagPicker').style.display='none';
+}
+function closeEditPlayerOverlay(e){ if(e.target===document.getElementById('editPlayerModal')) closeEditPlayerModal(); }
+
+// close flag pickers when clicking outside
+document.addEventListener('click', e=>{
+  if(sbFlagPickerOpen && !e.target.closest('#sbFlagPicker') && !e.target.closest('#sb-flag-preview') && e.target.id!=='sbFlagSearch'){
+    const btn=e.target.closest('button'); if(btn&&btn.onclick&&btn.onclick.toString().includes('toggleSbFlagPicker'))return;
+    sbFlagPickerOpen=false; document.getElementById('sbFlagPicker').style.display='none';
+  }
+  if(epmFlagPickerOpen && !e.target.closest('#epmFlagPicker') && !e.target.closest('#epm-flag-preview') && e.target.id!=='epmFlagSearch'){
+    const btn=e.target.closest('button'); if(btn&&btn.onclick&&btn.onclick.toString().includes('toggleEpmFlagPicker'))return;
+    epmFlagPickerOpen=false; document.getElementById('epmFlagPicker').style.display='none';
+  }
 });
 
 // ══ CLOUD SYNC ══

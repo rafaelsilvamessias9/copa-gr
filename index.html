@@ -448,6 +448,109 @@ body::before{
 .edit-action-btn.edit-info{color:var(--gold);}
 .edit-action-btn.del{color:var(--red);}
 
+/* ── PHASE TRANSITION ANIMATION ── */
+.phase-overlay{
+  position:fixed;inset:0;z-index:800;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1rem;pointer-events:none;
+  opacity:0;transition:opacity .3s;
+}
+.phase-overlay.show{opacity:1;pointer-events:all;}
+.phase-overlay-bg{
+  position:absolute;inset:0;background:#000;opacity:0;transition:opacity .4s;
+}
+.phase-overlay.show .phase-overlay-bg{opacity:.92;}
+.phase-beams{
+  position:absolute;inset:0;overflow:hidden;pointer-events:none;
+}
+.phase-beam{
+  position:absolute;top:50%;left:50%;
+  width:3px;height:60vh;
+  background:linear-gradient(to bottom, transparent, var(--gold), transparent);
+  transform-origin:top center;
+  opacity:0;
+}
+.phase-content{
+  position:relative;z-index:1;
+  text-align:center;
+  animation:phaseSlideIn .5s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes phaseSlideIn{
+  from{transform:translateY(40px) scale(.92);opacity:0;}
+  to{transform:translateY(0) scale(1);opacity:1;}
+}
+.phase-label{
+  font-family:'Oswald',sans-serif;font-size:.7rem;letter-spacing:6px;
+  color:var(--gold3);text-transform:uppercase;margin-bottom:.5rem;
+}
+.phase-name{
+  font-family:'Anton',sans-serif;font-size:4rem;letter-spacing:8px;
+  color:var(--gold);line-height:1;
+  text-shadow:0 0 60px var(--gold-glow),0 0 120px var(--gold-glow);
+}
+.phase-sub{
+  font-family:'Barlow Condensed',sans-serif;font-size:.85rem;
+  color:rgba(255,255,255,.4);letter-spacing:3px;margin-top:.5rem;
+}
+.phase-line{
+  width:120px;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  margin:.75rem auto;
+  animation:phaseLinePop .6s .2s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes phaseLinePop{from{width:0;opacity:0}to{width:120px;opacity:1}}
+
+/* bracket entrance animation */
+@keyframes bracketColIn{
+  from{opacity:0;transform:translateX(30px);}
+  to{opacity:1;transform:translateX(0);}
+}
+.bracket-col-enter{animation:bracketColIn .4s cubic-bezier(.22,1,.36,1) both;}
+
+/* remove from bracket option in eam */
+.edit-action-btn.remove-bracket{color:var(--orange);}
+
+/* ── CUSTOM CONFIRM MODAL ── */
+.confirm-overlay{
+  position:fixed;inset:0;z-index:2000;
+  background:rgba(0,0,0,.85);
+  display:none;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);
+}
+.confirm-overlay.open{display:flex;}
+.confirm-box{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:1.5rem;
+  width:min(360px,92vw);
+  box-shadow:0 0 40px rgba(0,0,0,.8);
+}
+.confirm-title{
+  font-family:'Anton',sans-serif;font-size:1rem;letter-spacing:3px;
+  color:var(--text);margin-bottom:.5rem;
+}
+.confirm-msg{
+  font-size:.82rem;color:var(--muted);line-height:1.5;margin-bottom:1.2rem;
+}
+.confirm-btns{display:flex;gap:.5rem;}
+.confirm-btn-ok{
+  flex:1;padding:.65rem;border-radius:6px;
+  font-family:'Oswald',sans-serif;font-size:.7rem;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:all .2s;border:none;
+}
+.confirm-btn-ok.danger{background:var(--red);color:#fff;}
+.confirm-btn-ok.danger:hover{background:#c0392b;}
+.confirm-btn-ok.warning{background:var(--orange);color:#000;}
+.confirm-btn-ok.warning:hover{background:#e68900;}
+.confirm-btn-cancel{
+  flex:1;padding:.65rem;border-radius:6px;
+  font-family:'Oswald',sans-serif;font-size:.7rem;letter-spacing:2px;
+  text-transform:uppercase;cursor:pointer;transition:all .2s;
+  background:transparent;color:var(--muted);border:1px solid var(--border);
+}
+.confirm-btn-cancel:hover{border-color:var(--text);color:var(--text);}
+
 /* misc */
 .live-dot{display:inline-block;width:7px;height:7px;background:var(--red);border-radius:50%;margin-right:5px;animation:blink 1.2s ease infinite;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -762,9 +865,37 @@ body::before{
   <button class="edit-action-btn edit-info" onclick="eamEdit()">
     <span class="eab-icon">✏️</span> Editar nome, foto, dados
   </button>
+  <button class="edit-action-btn remove-bracket" onclick="eamRemoveFromBracket()">
+    <span class="eab-icon">🚫</span> Retirar do chaveamento
+  </button>
   <button class="edit-action-btn del" onclick="eamDelete()">
     <span class="eab-icon">🗑</span> Excluir participante
   </button>
+</div>
+
+<!-- CUSTOM CONFIRM MODAL -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-title" id="confirmTitle">Confirmar</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-btns">
+      <button class="confirm-btn-cancel" onclick="confirmResolve(false)">Cancelar</button>
+      <button class="confirm-btn-ok danger" id="confirmOkBtn" onclick="confirmResolve(true)">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE TRANSITION OVERLAY -->
+<div class="phase-overlay" id="phaseOverlay">
+  <div class="phase-overlay-bg"></div>
+  <div class="phase-beams" id="phaseBeams"></div>
+  <div class="phase-content">
+    <div class="phase-label">Nova Fase</div>
+    <div class="phase-line"></div>
+    <div class="phase-name" id="phaseName">Semifinal</div>
+    <div class="phase-sub" id="phaseSub">4 participantes restantes</div>
+    <div class="phase-line"></div>
+  </div>
 </div>
 
 <!-- EDIT PLAYER MODAL -->
@@ -983,9 +1114,16 @@ function advanceRound(){
   }).flat();
   if(winners.length<=1)return;
   const nextIdx=currentRoundIdx+1;
-  if(nextIdx>=allRounds.length){buildRound(winners,nextIdx);currentRoundIdx=nextIdx;}
-  else{currentRoundIdx=nextIdx;}
-  renderEverything();
+  const nextPhaseName=getRoundName(winners.length);
+  if(nextIdx>=allRounds.length){
+    showPhaseAnimation(nextPhaseName, winners.length, ()=>{
+      buildRound(winners,nextIdx);currentRoundIdx=nextIdx;renderEverything();saveState();
+    });
+  } else {
+    showPhaseAnimation(nextPhaseName, winners.length, ()=>{
+      currentRoundIdx=nextIdx;renderEverything();saveState();
+    });
+  }
 }
 
 // ══ EDIT MODE ══
@@ -1000,8 +1138,65 @@ function updateEditModeUI(){
   if(editMode){btn.classList.add('active-edit');btn.textContent='✕ Sair da Edição';banner.classList.add('show');}
   else{btn.classList.remove('active-edit');btn.textContent='✏️ Editar Chaveamento';banner.classList.remove('show');}
 }
+// ── CUSTOM CONFIRM ──
+let _confirmResolve = null;
+
+function showConfirm(title, msg, okLabel='Confirmar', okType='danger'){
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent = msg;
+    const btn = document.getElementById('confirmOkBtn');
+    btn.textContent = okLabel;
+    btn.className = `confirm-btn-ok ${okType}`;
+    document.getElementById('confirmOverlay').classList.add('open');
+  });
+}
+
+function confirmResolve(result){
+  document.getElementById('confirmOverlay').classList.remove('open');
+  if(_confirmResolve){ _confirmResolve(result); _confirmResolve=null; }
+}
+
+// ── PHASE TRANSITION ANIMATION ──
+function showPhaseAnimation(phaseName, playerCount, onDone){
+  const overlay = document.getElementById('phaseOverlay');
+  const beams   = document.getElementById('phaseBeams');
+
+  // build light beams
+  beams.innerHTML = '';
+  const count = 12;
+  for(let i=0;i<count;i++){
+    const b = document.createElement('div');
+    b.className = 'phase-beam';
+    const angle = (360/count)*i;
+    const delay = (i/count)*0.4;
+    b.style.cssText = `transform:rotate(${angle}deg) translateX(-50%);animation:beamFlash .8s ${delay}s ease both;`;
+    beams.appendChild(b);
+  }
+
+  // inject beam keyframe if not exists
+  if(!document.getElementById('beamKf')){
+    const s = document.createElement('style');
+    s.id='beamKf';
+    s.textContent='@keyframes beamFlash{0%{opacity:0;height:0}40%{opacity:.6;height:55vh}100%{opacity:0;height:60vh}}';
+    document.head.appendChild(s);
+  }
+
+  document.getElementById('phaseName').textContent = phaseName;
+  document.getElementById('phaseSub').textContent = `${playerCount} participante${playerCount!==1?'s':''} restante${playerCount!==1?'s':''}`;
+
+  overlay.classList.add('show');
+
+  setTimeout(()=>{
+    overlay.classList.remove('show');
+    if(onDone) onDone();
+  }, 2800);
+}
+
+// ── REMOVE FROM BRACKET ──
 // ── EDIT ACTION MENU ──
-let eamTarget = null; // {rIdx, mIdx, side, player}
+let eamTarget = null;
 
 function handleSlotClick(rIdx, mIdx, side, event){
   if(!editMode || rIdx !== currentRoundIdx) return;
@@ -1011,59 +1206,138 @@ function handleSlotClick(rIdx, mIdx, side, event){
 
   eamTarget = {rIdx, mIdx, side, player};
 
-  // position menu near click
   const menu = document.getElementById('editActionMenu');
   document.getElementById('eamPlayerName').textContent = `${player.flag} ${player.name}`;
   menu.style.display = 'block';
 
-  // get click position
   const e = event || window.event;
   const x = e.clientX, y = e.clientY;
-  const mw = 190, mh = 130;
+  const mw = 200, mh = 160;
   const left = Math.min(x, window.innerWidth - mw - 10);
   const top  = Math.min(y + 8, window.innerHeight - mh - 10);
   menu.style.left = left + 'px';
   menu.style.top  = top + 'px';
 
-  // close on outside click
-  setTimeout(()=>{
-    document.addEventListener('click', closeEamOnOutside, {once:true});
-  }, 10);
+  // stop event from bubbling to document (prevents immediate close)
+  if(e.stopPropagation) e.stopPropagation();
 }
 
-function closeEamOnOutside(e){
+// close menu when clicking outside — attached on document
+document.addEventListener('click', function(e){
   const menu = document.getElementById('editActionMenu');
-  if(!menu.contains(e.target)) closeEam();
-}
+  if(menu && menu.style.display !== 'none' && !menu.contains(e.target)){
+    closeEam();
+  }
+});
 
 function closeEam(){
-  document.getElementById('editActionMenu').style.display='none';
+  const menu = document.getElementById('editActionMenu');
+  if(menu) menu.style.display='none';
+  // NOTE: we do NOT clear eamTarget here so action functions can still use it
 }
 
 function eamSwap(){
-  closeEam();
-  if(!eamTarget) return;
-  const {rIdx, mIdx, side, player} = eamTarget;
-  swapSource = {rIdx, mIdx, side, player};
-  openSwapModal(player);
+  const target = eamTarget;
+  closeEam(); eamTarget = null;
+  if(!target) return;
+  swapSource = {rIdx:target.rIdx, mIdx:target.mIdx, side:target.side, player:target.player};
+  openSwapModal(target.player);
 }
 
 function eamEdit(){
-  closeEam();
-  if(!eamTarget) return;
+  const target = eamTarget;
+  closeEam(); eamTarget = null;
+  if(!target) return;
   editingFromMatch = false;
-  openEditPlayerModal(eamTarget.player.id);
+  openEditPlayerModal(target.player.id);
 }
 
-function eamDelete(){
-  closeEam();
-  if(!eamTarget) return;
-  const {player} = eamTarget;
-  if(!confirm(`Excluir "${player.name}" do campeonato?`)) return;
-  sellers = sellers.filter(s=>s.id!==player.id);
+async function eamDelete(){
+  const target = eamTarget;
+  closeEam(); eamTarget = null;
+  if(!target) return;
+  const ok = await showConfirm('Excluir Participante', `Excluir "${target.player.name}" definitivamente do campeonato?`, 'Excluir', 'danger');
+  if(!ok) return;
+  sellers = sellers.filter(s=>s.id!==target.player.id);
   renderSellers(); renderSidebar(); renderBracket(); updateStats();
   saveState();
-  eamTarget = null;
+}
+
+async function eamRemoveFromBracket(){
+  const target = eamTarget;
+  closeEam(); eamTarget = null;
+  if(!target) return;
+
+  const {rIdx, mIdx, side, player} = target;
+
+  const ok = await showConfirm('Retirar do Chaveamento', `Retirar "${player.name}"? O adversário avança automaticamente.`, 'Retirar', 'warning');
+  if(!ok) return;
+
+  const round = allRounds[rIdx];
+  if(!round) return;
+  const m = round[mIdx];
+  if(!m) return;
+
+  // adversário
+  const opponent = side==='a' ? m.b : m.a;
+
+  // marca removido como eliminado
+  const s = sellers.find(x=>x.id===player.id);
+  if(s) s.status = 'eliminated';
+
+  // adversário vence automaticamente
+  if(opponent){
+    m.winner = Object.assign({}, opponent);
+    m.bye    = false;
+    m.draw   = false;
+    m.scoreA = 0;
+    m.scoreB = 0;
+    const ws = sellers.find(x=>x.id===opponent.id);
+    if(ws) ws.wins++;
+  } else {
+    m.winner = null;
+    m.bye    = true;
+  }
+
+  // verifica se rodada terminou
+  const roundDone = allRounds[rIdx].every(x=>x.winner||x.bye||x.draw);
+
+  if(roundDone){
+    const advancers = allRounds[rIdx].map(m2=>{
+      if(m2.draw)                  return [m2.a, m2.b];
+      if(m2.winner)                return [m2.winner];
+      if(m2.bye && m2.a)           return [m2.a];
+      return [];
+    }).flat().filter(Boolean);
+
+    if(advancers.length===1){
+      const ch = sellers.find(s2=>s2.id===advancers[0].id);
+      if(ch){
+        ch.status='champion';
+        document.getElementById('champFlag').textContent=ch.flag;
+        document.getElementById('champName').textContent=ch.name;
+        renderSellers(); renderSidebar(); renderBracket(); updateStats(); saveState();
+        setTimeout(()=>document.getElementById('champBanner').classList.add('show'),500);
+        return;
+      }
+    }
+
+    if(advancers.length>1){
+      const nextPhaseName = getRoundName(advancers.length);
+      renderSellers(); renderSidebar(); renderBracket(); updateStats(); saveState();
+      setTimeout(()=>{
+        showPhaseAnimation(nextPhaseName, advancers.length, ()=>{
+          buildRound(advancers, rIdx+1);
+          currentRoundIdx = rIdx+1;
+          renderEverything(); saveState();
+        });
+      }, 300);
+      return;
+    }
+  }
+
+  renderSellers(); renderSidebar(); renderBracket(); updateStats();
+  saveState();
 }
 
 function openSwapModal(sel){
@@ -1136,7 +1410,7 @@ function renderBracket(){
     const name=getRoundName(pCount);
     const isCurr=rIdx===currentRoundIdx;
     const isEdit=editMode&&isCurr;
-    html+=`<div class="bracket-col" style="opacity:${rIdx>currentRoundIdx?.4:1};transition:opacity .3s;">
+    html+=`<div class="bracket-col bracket-col-enter" style="opacity:${rIdx>currentRoundIdx?.4:1};transition:opacity .3s;animation-delay:${rIdx*0.08}s">
       <div class="col-header" style="${isCurr?'color:var(--gold);':''}">
         ${isCurr&&!editMode?'<span class="live-dot"></span>':''}
         ${isEdit?'<span style="color:var(--blue);margin-right:4px;">✏️</span>':''}${name}
@@ -1315,9 +1589,15 @@ function finalizeMatch(result){
       const ch=sellers.find(s=>s.id===advancers[0].id);
       if(ch){ch.status='champion';document.getElementById('champFlag').textContent=ch.flag;document.getElementById('champName').textContent=ch.name;setTimeout(()=>document.getElementById('champBanner').classList.add('show'),500);}
     } else {
+      const nextPhaseName = getRoundName(advancers.length);
+      renderEverything(); saveState();
       setTimeout(()=>{
-        buildRound(advancers,rIdx+1);currentRoundIdx=rIdx+1;renderEverything();
-      },350);
+        showPhaseAnimation(nextPhaseName, advancers.length, ()=>{
+          buildRound(advancers,rIdx+1);currentRoundIdx=rIdx+1;renderEverything();saveState();
+        });
+      }, 400);
+      renderSellers();renderBracket();updateStats();
+      return;
     }
   }
 
@@ -1361,14 +1641,6 @@ function updateStats(){
 }
 
 // ══ RESET ══
-function resetAll(){
-  if(!confirm('Reiniciar toda a Copa GR?'))return;
-  sellers.forEach(s=>{s.status='alive';s.wins=0;s.calls=0;s.fichas=0;});
-  allRounds=[];currentRoundIdx=0;currentMatchIdx=null;matchCount=0;editMode=false;swapSource=null;
-  updateEditModeUI();document.getElementById('champBanner').classList.remove('show');
-  document.getElementById('progressStrip').innerHTML='';renderEverything();
-}
-
 // ══ FLAG PICKER ══
 let flagPickerOpen=false;
 function renderFlagGrid(list){
@@ -1429,8 +1701,9 @@ function renderSidebar(){
   elimTitle.style.display = elim.length ? 'block' : 'none';
 }
 
-function removeSellerAndRefresh(id){
-  if(!confirm('Excluir este participante?')) return;
+async function removeSellerAndRefresh(id){
+  const ok = await showConfirm('Excluir Participante', 'Excluir este participante do campeonato?', 'Excluir', 'danger');
+  if(!ok) return;
   sellers = sellers.filter(s=>s.id!==id);
   renderSellers(); renderSidebar(); updateStats(); renderBracket();
   saveState();
@@ -1577,9 +1850,10 @@ function saveEditPlayer(){
   saveState();
 }
 
-function deletePlayerFromModal(){
+async function deletePlayerFromModal(){
   if(!editingPlayerId) return;
-  if(!confirm('Excluir este participante definitivamente?')) return;
+  const ok = await showConfirm('Excluir Participante', 'Excluir este participante definitivamente?', 'Excluir', 'danger');
+  if(!ok) return;
   sellers = sellers.filter(s=>s.id!==editingPlayerId);
   editingFromMatch = false;
   closeEditPlayerModal();
@@ -1696,9 +1970,9 @@ removeSeller = function(id){ _origRemoveSeller(id); saveState(); };
 const _origDoSwap = doSwap;
 doSwap = function(a,b){ _origDoSwap(a,b); saveState(); };
 
-const _origResetAll = resetAll;
-resetAll = function(){
-  if(!confirm('Reiniciar toda a Copa GR? Isso apagará tudo, inclusive na nuvem.'))return;
+async function resetAll(){
+  const ok = await showConfirm('Reiniciar Copa', 'Reiniciar toda a Copa GR? Isso apagará tudo, inclusive na nuvem.', 'Reiniciar', 'danger');
+  if(!ok) return;
   sellers=defaultSellers.map((s,i)=>({...s,id:i,status:'alive',wins:0,calls:0,fichas:0}));
   allRounds=[];currentRoundIdx=0;currentMatchIdx=null;matchCount=0;editMode=false;swapSource=null;
   updateEditModeUI();

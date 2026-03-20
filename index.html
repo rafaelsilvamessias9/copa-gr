@@ -651,7 +651,8 @@ body::before{
         👥 Elenco
         <span class="sidebar-count" id="sidebarCount">0</span>
       </button>
-      <button class="btn btn-danger" onclick="resetAll()">↺ Reiniciar</button>
+      <button class="btn btn-danger" onclick="resetCopa()">↺ Reiniciar Copa</button>
+      <button class="btn btn-danger" style="opacity:.6;font-size:.6rem;" onclick="resetAll()">🗑 Apagar Tudo</button>
     </div>
     <div class="edit-banner" id="editBanner">
       <span>✏️</span>
@@ -724,7 +725,8 @@ body::before{
   <div class="panel" id="panel-sellers">
     <div class="ctrl-bar">
       <button class="btn btn-primary" onclick="toggleAddForm()">+ Adicionar</button>
-      <button class="btn btn-danger" onclick="resetAll()">↺ Reiniciar Copa</button>
+      <button class="btn btn-danger" onclick="resetCopa()">↺ Reiniciar Copa</button>
+      <button class="btn btn-danger" style="opacity:.6;font-size:.6rem;" onclick="resetAll()">🗑 Apagar Tudo</button>
     </div>
     <div class="add-form" id="addForm">
       <div class="form-row">
@@ -1701,10 +1703,22 @@ function renderSidebar(){
   elimTitle.style.display = elim.length ? 'block' : 'none';
 }
 
-async function removeSellerAndRefresh(id){
-  const ok = await showConfirm('Excluir Participante', 'Excluir este participante do campeonato?', 'Excluir', 'danger');
-  if(!ok) return;
-  sellers = sellers.filter(s=>s.id!==id);
+function removeSellerAndRefresh(id){
+  const s = sellers.find(x=>x.id===id);
+  if(!s) return;
+  // Remove seller from any active bracket matches too
+  allRounds.forEach(round => round.forEach(m => {
+    if(m.a && m.a.id===id){
+      if(m.b){ m.winner=Object.assign({},m.b); m.bye=false; }
+      else { m.bye=true; }
+    }
+    if(m.b && m.b.id===id){
+      if(m.a){ m.winner=Object.assign({},m.a); m.bye=false; }
+      else { m.bye=true; }
+    }
+    if(m.winner && m.winner.id===id) m.winner=null;
+  }));
+  sellers = sellers.filter(x=>x.id!==id);
   renderSellers(); renderSidebar(); updateStats(); renderBracket();
   saveState();
 }
@@ -1970,16 +1984,37 @@ removeSeller = function(id){ _origRemoveSeller(id); saveState(); };
 const _origDoSwap = doSwap;
 doSwap = function(a,b){ _origDoSwap(a,b); saveState(); };
 
+// Reinicia só o campeonato — mantém elenco
+async function resetCopa(){
+  const ok = await showConfirm(
+    'Reiniciar Campeonato',
+    'Zera o chaveamento e os resultados, mas mantém todos os vendedores cadastrados.',
+    'Reiniciar Copa', 'danger'
+  );
+  if(!ok) return;
+  sellers.forEach(s=>{ s.status='alive'; s.wins=0; s.calls=0; s.fichas=0; });
+  allRounds=[];currentRoundIdx=0;currentMatchIdx=null;matchCount=0;editMode=false;swapSource=null;
+  updateEditModeUI();
+  document.getElementById('champBanner').classList.remove('show');
+  document.getElementById('progressStrip').innerHTML='';
+  renderEverything(); saveState();
+}
+
+// Reinicia tudo — campeonato + elenco
 async function resetAll(){
-  const ok = await showConfirm('Reiniciar Copa', 'Reiniciar toda a Copa GR? Isso apagará tudo, inclusive na nuvem.', 'Reiniciar', 'danger');
+  const ok = await showConfirm(
+    'Apagar Tudo',
+    'Apaga o campeonato E todos os vendedores cadastrados. Essa ação não pode ser desfeita.',
+    'Apagar Tudo', 'danger'
+  );
   if(!ok) return;
   sellers=defaultSellers.map((s,i)=>({...s,id:i,status:'alive',wins:0,calls:0,fichas:0}));
   allRounds=[];currentRoundIdx=0;currentMatchIdx=null;matchCount=0;editMode=false;swapSource=null;
   updateEditModeUI();
   document.getElementById('champBanner').classList.remove('show');
   document.getElementById('progressStrip').innerHTML='';
-  renderEverything();saveState();
-};
+  renderEverything(); saveState();
+}
 
 // ══ INIT — carrega localStorage imediatamente, Firebase sobrepõe se mais novo ══
 (function init(){

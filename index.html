@@ -646,6 +646,7 @@ body::before{
     <div class="ctrl-bar">
       <button class="btn btn-primary" onclick="generateBracket()">⚡ Gerar Chaveamento</button>
       <button class="btn btn-blue" id="editModeBtn" onclick="toggleEditMode()">✏️ Editar Chaveamento</button>
+      <button class="btn btn-outline" onclick="goBackRound()" id="btnBackRound" style="display:none;">◀ Fase Anterior</button>
       <button class="btn btn-outline" onclick="advanceRound()">➡ Próxima Rodada</button>
       <button class="btn btn-sidebar" onclick="toggleSidebar()" id="sidebarBtn">
         👥 Elenco
@@ -1104,6 +1105,56 @@ function generateBracket(){
   renderEverything();
 }
 
+async function goBackRound(){
+  if(!allRounds.length || currentRoundIdx===0) return;
+
+  const ok = await showConfirm(
+    'Voltar Fase',
+    'Voltar para a fase anterior? Os resultados da fase atual e anterior serão apagados para rejogo.',
+    'Voltar', 'warning'
+  );
+  if(!ok) return;
+
+  // Restaura todos os jogadores das rodadas afetadas como alive
+  const roundsToUndo = allRounds.slice(currentRoundIdx-1);
+  roundsToUndo.forEach(round => {
+    round.forEach(m => {
+      if(m.winner){
+        const ws = sellers.find(s=>s.id===m.winner.id);
+        if(ws && ws.wins>0) ws.wins--;
+      }
+      if(m.draw){
+        [m.a,m.b].forEach(p=>{
+          if(!p) return;
+          const s = sellers.find(x=>x.id===p.id);
+          if(s && s.wins>0) s.wins--;
+        });
+      }
+      [m.a,m.b].forEach(p=>{
+        if(!p) return;
+        const s = sellers.find(x=>x.id===p.id);
+        if(s && s.status==='eliminated') s.status='alive';
+      });
+      m.winner=null; m.draw=false; m.bye=false;
+      m.scoreA=0; m.scoreB=0;
+    });
+  });
+
+  // Remove rodadas a partir da rodada anterior (volta e limpa ela também)
+  allRounds = allRounds.slice(0, currentRoundIdx-1);
+  currentRoundIdx = Math.max(0, currentRoundIdx-1);
+
+  // Reconstrói a rodada anterior com os jogadores originais
+  const prevPlayers = roundsToUndo[0].map(m=>[m.a,m.b]).flat().filter(Boolean);
+  // Remove duplicatas
+  const seen = new Set();
+  const unique = prevPlayers.filter(p=>{ if(seen.has(p.id)) return false; seen.add(p.id); return true; });
+  buildRound(unique, currentRoundIdx);
+
+  document.getElementById('champBanner').classList.remove('show');
+  renderEverything(); saveState();
+}
+
 function advanceRound(){
   if(!allRounds.length){alert('Gere o chaveamento primeiro!');return;}
   const curr=allRounds[currentRoundIdx];
@@ -1381,6 +1432,9 @@ function renderEverything(){
   renderBracket();renderSellers();updateStats();renderProgress();
   document.getElementById('sidebarCount').textContent=sellers.length;
   renderSidebar();
+  // mostra/esconde botão voltar fase
+  const btnBack = document.getElementById('btnBackRound');
+  if(btnBack) btnBack.style.display = (allRounds.length && currentRoundIdx>=0) ? 'inline-flex' : 'none';
 }
 
 function renderProgress(){

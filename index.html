@@ -553,6 +553,31 @@ body::before{
 }
 .confirm-btn-cancel:hover{border-color:var(--text);color:var(--text);}
 
+/* ── REPESCAGEM MODAL ── */
+.repesc-modal{background:var(--surface2);border:1px solid var(--orange);border-radius:12px;width:min(520px,96vw);max-height:88vh;overflow-y:auto;box-shadow:0 0 40px rgba(0,0,0,.8),0 0 20px rgba(255,152,0,.1);}
+.repesc-header{background:linear-gradient(180deg,#000,var(--surface2));padding:1rem 1.2rem;border-bottom:1px solid rgba(255,152,0,.2);display:flex;align-items:center;justify-content:space-between;}
+.repesc-title{font-family:'Anton',sans-serif;font-size:1rem;letter-spacing:3px;color:var(--orange);}
+.repesc-body{padding:1.2rem;}
+.repesc-section{margin-bottom:1.2rem;}
+.repesc-section-title{font-family:'Oswald',sans-serif;font-size:.65rem;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:.6rem;padding-bottom:.4rem;border-bottom:1px solid var(--border);}
+.repesc-grid{display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto;scrollbar-width:thin;}
+.repesc-item{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.55rem .75rem;display:flex;align-items:center;gap:.6rem;cursor:pointer;transition:all .18s;}
+.repesc-item:hover{border-color:var(--orange);background:rgba(255,152,0,.07);}
+.repesc-item.selected{border-color:var(--orange);background:rgba(255,152,0,.12);box-shadow:0 0 10px rgba(255,152,0,.15);}
+.repesc-item-avatar{width:32px;height:32px;border-radius:50%;overflow:hidden;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;border:1px solid var(--border);}
+.repesc-item-avatar img{width:100%;height:100%;object-fit:cover;}
+.repesc-item-info{flex:1;min-width:0;}
+.repesc-item-name{font-family:'Oswald',sans-serif;font-size:.8rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.repesc-item-sub{font-size:.6rem;letter-spacing:1px;color:var(--muted);text-transform:uppercase;}
+.repesc-item-check{color:var(--orange);font-size:1rem;flex-shrink:0;}
+.repesc-target{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.75rem;margin-bottom:.75rem;}
+.repesc-target-label{font-size:.6rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:.4rem;}
+.repesc-target-opts{display:flex;gap:.4rem;flex-wrap:wrap;}
+.repesc-target-btn{font-family:'Barlow Condensed',sans-serif;font-size:.75rem;font-weight:600;padding:.4rem .8rem;border-radius:4px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);cursor:pointer;transition:all .18s;}
+.repesc-target-btn:hover{border-color:var(--orange);color:var(--orange);}
+.repesc-target-btn.active{border-color:var(--orange);background:rgba(255,152,0,.1);color:var(--orange);}
+.repesc-empty{font-size:.75rem;color:var(--muted);text-align:center;padding:1rem;font-family:'Oswald',sans-serif;letter-spacing:2px;}
+
 /* misc */
 .live-dot{display:inline-block;width:7px;height:7px;background:var(--red);border-radius:50%;margin-right:5px;animation:blink 1.2s ease infinite;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -654,6 +679,7 @@ body::before{
         👥 Elenco
         <span class="sidebar-count" id="sidebarCount">0</span>
       </button>
+      <button class="btn" style="background:transparent;color:var(--orange);border-color:rgba(255,152,0,.3);" onclick="openRepescagem()">🔄 Repescagem</button>
       <button class="btn btn-danger" onclick="resetCopa()">↺ Reiniciar Copa</button>
       <button class="btn btn-danger" style="opacity:.6;font-size:.6rem;" onclick="resetAll()">🗑 Apagar Tudo</button>
     </div>
@@ -900,6 +926,66 @@ body::before{
     <div class="phase-name" id="phaseName">Semifinal</div>
     <div class="phase-sub" id="phaseSub">4 participantes restantes</div>
     <div class="phase-line"></div>
+  </div>
+</div>
+
+<!-- REPESCAGEM MODAL -->
+<div class="modal-overlay" id="repescModal" onclick="closeRepescOverlay(event)">
+  <div class="repesc-modal">
+    <div class="repesc-header">
+      <div class="repesc-title">🔄 Repescagem</div>
+      <button class="modal-close" onclick="closeRepescModal()">✕</button>
+    </div>
+    <div class="repesc-body">
+
+      <!-- ONDE INSERIR -->
+      <div class="repesc-section">
+        <div class="repesc-section-title">Inserir na rodada</div>
+        <div class="repesc-target">
+          <div class="repesc-target-label">Escolha como adicionar ao chaveamento</div>
+          <div class="repesc-target-opts" id="repescTargetOpts"></div>
+        </div>
+      </div>
+
+      <!-- ELIMINADOS PARA RESGATAR -->
+      <div class="repesc-section" id="repescEliminatedSection">
+        <div class="repesc-section-title">Resgatar eliminado</div>
+        <div class="repesc-grid" id="repescEliminatedList"></div>
+      </div>
+
+      <!-- NOVO PARTICIPANTE -->
+      <div class="repesc-section">
+        <div class="repesc-section-title">Ou adicionar novo participante</div>
+        <div style="background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:.75rem;">
+          <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;">
+            <div id="repesc-photo-btn" onclick="document.getElementById('repesc-inp-photo').click()" style="width:40px;height:40px;border-radius:50%;border:2px dashed var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;overflow:hidden;">📷</div>
+            <input type="file" id="repesc-inp-photo" accept="image/*" style="display:none" onchange="handleRepescPhoto(this)">
+            <input class="sb-input" id="repesc-inp-name" placeholder="Nome do participante" style="flex:1;">
+          </div>
+          <div style="display:flex;gap:.4rem;margin-bottom:.5rem;">
+            <input class="sb-input" id="repesc-inp-country" placeholder="País" style="flex:1;">
+            <div style="position:relative;display:flex;gap:.3rem;align-items:center;">
+              <div id="repesc-flag-preview" onclick="toggleRepescFlagPicker()" style="width:34px;height:30px;background:var(--bg);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;cursor:pointer;">🏳️</div>
+              <button type="button" onclick="toggleRepescFlagPicker()" style="background:var(--surface3);border:1px solid var(--border);color:var(--gold);border-radius:4px;padding:5px 7px;cursor:pointer;font-size:.62rem;font-family:'Oswald',sans-serif;letter-spacing:2px;">▼</button>
+              <input type="hidden" id="repesc-inp-flag" value="🏳️">
+              <div class="flag-dropdown" id="repescFlagPicker" style="top:100%;right:0;left:auto;width:260px;">
+                <input class="flag-search" id="repescFlagSearch" placeholder="🔍 Buscar..." oninput="filterRepescFlags(this.value)">
+                <div class="flag-grid" id="repescFlagGrid"></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%" onclick="addNewToRepescagem()">+ Adicionar ao Chaveamento</button>
+        </div>
+      </div>
+
+      <!-- AÇÕES DOS ELIMINADOS SELECIONADOS -->
+      <div id="repescActions" style="display:none;margin-top:.5rem;">
+        <button class="btn" style="width:100%;background:var(--orange);color:#000;border-color:var(--orange);font-weight:700;" onclick="confirmarRepescagem()">
+          🔄 Inserir Selecionados no Chaveamento
+        </button>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -1253,6 +1339,27 @@ function showPhaseAnimation(phaseName, playerCount, onDone){
 // ── EDIT ACTION MENU ──
 let eamTarget = null;
 
+function openByeEdit(rIdx, mIdx, event){
+  if(event) event.stopPropagation();
+  const m = allRounds[rIdx][mIdx];
+  if(!m || !m.a) return;
+
+  eamTarget = {rIdx, mIdx, side:'a', player:m.a, isBye:true};
+
+  const menu = document.getElementById('editActionMenu');
+  document.getElementById('eamPlayerName').textContent = `${m.a.flag} ${m.a.name} · BYE`;
+  menu.style.display = 'block';
+
+  const e = event || window.event;
+  const x = e ? e.clientX : window.innerWidth/2;
+  const y = e ? e.clientY : window.innerHeight/2;
+  const mw = 200, mh = 160;
+  const left = Math.min(x, window.innerWidth - mw - 10);
+  const top  = Math.min(y + 8, window.innerHeight - mh - 10);
+  menu.style.left = left + 'px';
+  menu.style.top  = top + 'px';
+}
+
 function handleSlotClick(rIdx, mIdx, side, event){
   if(!editMode || rIdx !== currentRoundIdx) return;
   const m = allRounds[rIdx][mIdx];
@@ -1479,8 +1586,7 @@ function renderBracket(){
 
     round.forEach((m,mIdx)=>{
       if(m.bye){
-        const byeEdit = isEdit && m.a;
-        if(byeEdit){
+        if(isEdit && m.a){
           html+=`<div class="match-wrap">
             <div class="bye-card edit-mode" onclick="handleSlotClick(${rIdx},${mIdx},'a',event)">
               <span style="color:var(--blue);margin-right:6px;">↔ ✏️</span>${m.a.flag} ${m.a.name} · BYE
@@ -1964,6 +2070,171 @@ document.addEventListener('click', e=>{
     epmFlagPickerOpen=false; document.getElementById('epmFlagPicker').style.display='none';
   }
 });
+
+// ══ REPESCAGEM ══
+let repescSelected = []; // IDs de eliminados selecionados
+let repescMode = 'bye';  // 'bye' | 'new-match' | 'existing'
+let repescPhotoData = '';
+let repescFlagPickerOpen = false;
+
+function openRepescagem(){
+  if(!allRounds.length){ alert('Gere o chaveamento primeiro!'); return; }
+  repescSelected = [];
+  repescPhotoData = '';
+  document.getElementById('repesc-inp-name').value='';
+  document.getElementById('repesc-inp-country').value='';
+  document.getElementById('repesc-inp-flag').value='🏳️';
+  document.getElementById('repesc-flag-preview').textContent='🏳️';
+  document.getElementById('repesc-photo-btn').innerHTML='📷';
+  renderRepescModal();
+  document.getElementById('repescModal').classList.add('open');
+}
+
+function renderRepescModal(){
+  const curr = allRounds[currentRoundIdx] || [];
+  const elim = sellers.filter(s=>s.status==='eliminated');
+
+  // Target options
+  const hasOpenSlot = curr.some(m=>m.bye); // tem BYE disponível
+  let optsHtml='';
+  optsHtml+=`<button class="repesc-target-btn ${repescMode==='bye'?'active':''}" onclick="setRepescMode('bye')">Entrar em duelo com BYE</button>`;
+  optsHtml+=`<button class="repesc-target-btn ${repescMode==='new-match'?'active':''}" onclick="setRepescMode('new-match')">Criar novo duelo</button>`;
+  document.getElementById('repescTargetOpts').innerHTML=optsHtml;
+
+  // Eliminated list
+  let elimHtml='';
+  if(elim.length===0){
+    elimHtml=`<div class="repesc-empty">Nenhum eliminado disponível</div>`;
+  } else {
+    elimHtml = elim.map(s=>{
+      const sel = repescSelected.includes(s.id);
+      const avatar = s.photo
+        ? `<div class="repesc-item-avatar"><img src="${s.photo}"></div>`
+        : `<div class="repesc-item-avatar">${s.flag}</div>`;
+      return `<div class="repesc-item ${sel?'selected':''}" onclick="toggleRepescSelect(${s.id})">
+        ${avatar}
+        <div class="repesc-item-info">
+          <div class="repesc-item-name">${s.name}</div>
+          <div class="repesc-item-sub">${s.flag} ${s.country} · ${s.wins} vitória(s)</div>
+        </div>
+        ${sel?'<div class="repesc-item-check">✓</div>':''}
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('repescEliminatedList').innerHTML=elimHtml;
+
+  // Show action button if any selected
+  document.getElementById('repescActions').style.display = repescSelected.length>0 ? 'block' : 'none';
+}
+
+function setRepescMode(mode){
+  repescMode = mode;
+  renderRepescModal();
+}
+
+function toggleRepescSelect(id){
+  const idx = repescSelected.indexOf(id);
+  if(idx>=0) repescSelected.splice(idx,1);
+  else repescSelected.push(id);
+  renderRepescModal();
+}
+
+function confirmarRepescagem(){
+  if(!repescSelected.length) return;
+  const curr = allRounds[currentRoundIdx];
+
+  repescSelected.forEach(id=>{
+    const s = sellers.find(x=>x.id===id);
+    if(!s) return;
+    s.status='alive'; // reativa
+
+    if(repescMode==='bye'){
+      // Coloca no primeiro BYE disponível
+      const byeMatch = curr.find(m=>m.bye);
+      if(byeMatch){
+        byeMatch.b = {...s};
+        byeMatch.bye = false;
+        byeMatch.winner = null;
+        byeMatch.scoreA = 0; byeMatch.scoreB = 0;
+      } else {
+        // Sem BYE — cria novo duelo com BYE
+        curr.push({a:{...s}, b:null, winner:{...s}, bye:true, draw:false, roundIdx:currentRoundIdx, scoreA:0, scoreB:0});
+      }
+    } else {
+      // Novo duelo (BYE) — aguarda adversário
+      curr.push({a:{...s}, b:null, winner:{...s}, bye:true, draw:false, roundIdx:currentRoundIdx, scoreA:0, scoreB:0});
+    }
+  });
+
+  closeRepescModal();
+  renderEverything(); saveState();
+}
+
+function addNewToRepescagem(){
+  const name = document.getElementById('repesc-inp-name').value.trim();
+  const country = document.getElementById('repesc-inp-country').value.trim();
+  const flag = document.getElementById('repesc-inp-flag').value||'🏳️';
+  if(!name||!country){ alert('Preencha nome e país!'); return; }
+
+  const newSeller = {
+    name, country, flag,
+    photo: repescPhotoData||'',
+    id: Date.now(),
+    status:'alive', wins:0, calls:0, fichas:0
+  };
+  sellers.push(newSeller);
+
+  const curr = allRounds[currentRoundIdx];
+  if(repescMode==='bye'){
+    const byeMatch = curr.find(m=>m.bye);
+    if(byeMatch){
+      byeMatch.b = {...newSeller};
+      byeMatch.bye = false;
+      byeMatch.winner = null;
+      byeMatch.scoreA=0; byeMatch.scoreB=0;
+    } else {
+      curr.push({a:{...newSeller}, b:null, winner:{...newSeller}, bye:true, draw:false, roundIdx:currentRoundIdx, scoreA:0, scoreB:0});
+    }
+  } else {
+    curr.push({a:{...newSeller}, b:null, winner:{...newSeller}, bye:true, draw:false, roundIdx:currentRoundIdx, scoreA:0, scoreB:0});
+  }
+
+  closeRepescModal();
+  renderEverything(); saveState();
+}
+
+function handleRepescPhoto(input){
+  const file=input.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=e=>{
+    repescPhotoData=e.target.result;
+    document.getElementById('repesc-photo-btn').innerHTML=`<img src="${repescPhotoData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+  };
+  r.readAsDataURL(file);
+}
+
+function toggleRepescFlagPicker(){
+  repescFlagPickerOpen=!repescFlagPickerOpen;
+  const p=document.getElementById('repescFlagPicker');
+  p.style.display=repescFlagPickerOpen?'block':'none';
+  if(repescFlagPickerOpen){
+    document.getElementById('repescFlagGrid').innerHTML=FLAGS.map(({f,c})=>`<div class="flag-item" onclick="selectRepescFlag('${f}','${c}')" title="${c}">${f}</div>`).join('');
+    document.getElementById('repescFlagSearch').value='';
+    setTimeout(()=>document.getElementById('repescFlagSearch').focus(),50);
+  }
+}
+function filterRepescFlags(q){
+  document.getElementById('repescFlagGrid').innerHTML=(q?FLAGS.filter(({c})=>c.toLowerCase().includes(q.toLowerCase())):FLAGS).map(({f,c})=>`<div class="flag-item" onclick="selectRepescFlag('${f}','${c}')" title="${c}">${f}</div>`).join('');
+}
+function selectRepescFlag(f,c){
+  document.getElementById('repesc-inp-flag').value=f;
+  document.getElementById('repesc-flag-preview').textContent=f;
+  if(!document.getElementById('repesc-inp-country').value) document.getElementById('repesc-inp-country').value=c;
+  repescFlagPickerOpen=false; document.getElementById('repescFlagPicker').style.display='none';
+}
+
+function closeRepescModal(){ document.getElementById('repescModal').classList.remove('open'); repescSelected=[]; }
+function closeRepescOverlay(e){ if(e.target===document.getElementById('repescModal')) closeRepescModal(); }
 
 // ══ CLOUD SYNC ══
 function getState(){

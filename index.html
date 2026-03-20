@@ -195,6 +195,8 @@ body::before{
 .mp.edit-slot:hover{background:rgba(79,195,247,.1)!important;}
 
 .bye-card{background:transparent;border:1px dashed rgba(255,215,0,.1);border-radius:6px;padding:10px;flex:1;text-align:center;font-size:.6rem;letter-spacing:2px;color:rgba(255,255,255,.15);text-transform:uppercase;}
+.bye-card.edit-mode{border-color:rgba(79,195,247,.3);color:rgba(79,195,247,.6);cursor:pointer;transition:all .2s;}
+.bye-card.edit-mode:hover{border-color:var(--blue);background:rgba(79,195,247,.06);}
 .bracket-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;gap:1rem;}
 .bracket-empty-icon{font-size:3rem;opacity:.3;}
 .bracket-empty-text{font-family:'Oswald',sans-serif;font-size:.7rem;letter-spacing:4px;text-transform:uppercase;color:var(--muted);}
@@ -646,6 +648,7 @@ body::before{
     <div class="ctrl-bar">
       <button class="btn btn-primary" onclick="generateBracket()">⚡ Gerar Chaveamento</button>
       <button class="btn btn-blue" id="editModeBtn" onclick="toggleEditMode()">✏️ Editar Chaveamento</button>
+      <button class="btn btn-outline" onclick="goBackRound()" id="btnBackRound" style="display:none;">◀ Fase Anterior</button>
       <button class="btn btn-outline" onclick="advanceRound()">➡ Próxima Rodada</button>
       <button class="btn btn-sidebar" onclick="toggleSidebar()" id="sidebarBtn">
         👥 Elenco
@@ -1104,6 +1107,56 @@ function generateBracket(){
   renderEverything();
 }
 
+async function goBackRound(){
+  if(!allRounds.length || currentRoundIdx===0) return;
+
+  const ok = await showConfirm(
+    'Voltar Fase',
+    'Voltar para a fase anterior? Os resultados da fase atual e anterior serão apagados para rejogo.',
+    'Voltar', 'warning'
+  );
+  if(!ok) return;
+
+  // Restaura todos os jogadores das rodadas afetadas como alive
+  const roundsToUndo = allRounds.slice(currentRoundIdx-1);
+  roundsToUndo.forEach(round => {
+    round.forEach(m => {
+      if(m.winner){
+        const ws = sellers.find(s=>s.id===m.winner.id);
+        if(ws && ws.wins>0) ws.wins--;
+      }
+      if(m.draw){
+        [m.a,m.b].forEach(p=>{
+          if(!p) return;
+          const s = sellers.find(x=>x.id===p.id);
+          if(s && s.wins>0) s.wins--;
+        });
+      }
+      [m.a,m.b].forEach(p=>{
+        if(!p) return;
+        const s = sellers.find(x=>x.id===p.id);
+        if(s && s.status==='eliminated') s.status='alive';
+      });
+      m.winner=null; m.draw=false; m.bye=false;
+      m.scoreA=0; m.scoreB=0;
+    });
+  });
+
+  // Remove rodadas a partir da rodada anterior (volta e limpa ela também)
+  allRounds = allRounds.slice(0, currentRoundIdx-1);
+  currentRoundIdx = Math.max(0, currentRoundIdx-1);
+
+  // Reconstrói a rodada anterior com os jogadores originais
+  const prevPlayers = roundsToUndo[0].map(m=>[m.a,m.b]).flat().filter(Boolean);
+  // Remove duplicatas
+  const seen = new Set();
+  const unique = prevPlayers.filter(p=>{ if(seen.has(p.id)) return false; seen.add(p.id); return true; });
+  buildRound(unique, currentRoundIdx);
+
+  document.getElementById('champBanner').classList.remove('show');
+  renderEverything(); saveState();
+}
+
 function advanceRound(){
   if(!allRounds.length){alert('Gere o chaveamento primeiro!');return;}
   const curr=allRounds[currentRoundIdx];
@@ -1206,22 +1259,23 @@ function handleSlotClick(rIdx, mIdx, side, event){
   const player = side==='a' ? m.a : m.b;
   if(!player) return;
 
-  eamTarget = {rIdx, mIdx, side, player};
+  // prevent event from immediately closing the menu
+  if(event && event.stopPropagation) event.stopPropagation();
+
+  eamTarget = {rIdx, mIdx, side, player, isBye: m.bye};
 
   const menu = document.getElementById('editActionMenu');
-  document.getElementById('eamPlayerName').textContent = `${player.flag} ${player.name}`;
+  document.getElementById('eamPlayerName').textContent = `${player.flag} ${player.name}${m.bye?' · BYE':''}`;
   menu.style.display = 'block';
 
   const e = event || window.event;
-  const x = e.clientX, y = e.clientY;
+  const x = e ? e.clientX : window.innerWidth/2;
+  const y = e ? e.clientY : window.innerHeight/2;
   const mw = 200, mh = 160;
   const left = Math.min(x, window.innerWidth - mw - 10);
   const top  = Math.min(y + 8, window.innerHeight - mh - 10);
   menu.style.left = left + 'px';
   menu.style.top  = top + 'px';
-
-  // stop event from bubbling to document (prevents immediate close)
-  if(e.stopPropagation) e.stopPropagation();
 }
 
 // close menu when clicking outside — attached on document
@@ -1347,12 +1401,14 @@ function openSwapModal(sel){
   const round=allRounds[currentRoundIdx];
   let html='';
   round.forEach((m,mIdx)=>{
-    [['a',m.a],['b',m.b]].forEach(([side,player])=>{
+    const slots = m.bye ? [['a',m.a]] : [['a',m.a],['b',m.b]];
+    slots.forEach(([side,player])=>{
       if(!player)return;
       const isSelf=swapSource&&swapSource.mIdx===mIdx&&swapSource.side===side;
+      const label = m.bye ? `Duelo ${mIdx+1} · BYE` : `Duelo ${mIdx+1} · ${side==='a'?'Superior':'Inferior'}`;
       html+=`<div class="slot-pick-card ${isSelf?'selected':''}" onclick="doSwap(${mIdx},'${side}')">
         <span class="spc-flag">${player.flag}</span>
-        <div><div class="spc-name">${player.name}</div><div class="spc-match">Duelo ${mIdx+1} · ${side==='a'?'Superior':'Inferior'}</div></div>
+        <div><div class="spc-name">${player.name}</div><div class="spc-match">${label}</div></div>
       </div>`;
     });
   });
@@ -1381,6 +1437,9 @@ function renderEverything(){
   renderBracket();renderSellers();updateStats();renderProgress();
   document.getElementById('sidebarCount').textContent=sellers.length;
   renderSidebar();
+  // mostra/esconde botão voltar fase
+  const btnBack = document.getElementById('btnBackRound');
+  if(btnBack) btnBack.style.display = (allRounds.length && currentRoundIdx>=0) ? 'inline-flex' : 'none';
 }
 
 function renderProgress(){
@@ -1420,7 +1479,18 @@ function renderBracket(){
 
     round.forEach((m,mIdx)=>{
       if(m.bye){
-        html+=`<div class="match-wrap"><div class="bye-card">${m.a.flag} ${m.a.name} · BYE</div></div>`;
+        const byeEdit = isEdit && m.a;
+        if(byeEdit){
+          html+=`<div class="match-wrap">
+            <div class="bye-card edit-mode" onclick="handleSlotClick(${rIdx},${mIdx},'a',event)">
+              <span style="color:var(--blue);margin-right:6px;">↔ ✏️</span>${m.a.flag} ${m.a.name} · BYE
+            </div>
+          </div>`;
+        } else {
+          html+=`<div class="match-wrap">
+            <div class="bye-card">${m.a?m.a.flag:''} ${m.a?m.a.name:''} · BYE</div>
+          </div>`;
+        }
       }else{
         const finished=m.winner||m.draw;
         const isClickable=isCurr&&!isEdit;
